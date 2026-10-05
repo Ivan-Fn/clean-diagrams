@@ -22,9 +22,17 @@ export function findRenderer(need = 'png') {
   return null;
 }
 const run = (r, args) => {
+  const fontDir = process.env.CLEAN_DIAGRAMS_FONT_DIR;
+  if (fontDir && r.name === 'resvg') args = ['--use-fonts-dir', fontDir, ...args];
   const p = spawnSync(r.name, args, { encoding: 'utf8', timeout: 120000 });
-  if (p.status !== 0) throw new Error(`${r.name} failed: ${(p.stderr || p.stdout || '').trim().split('\n').slice(-3).join(' | ')}`);
+  const err = (p.stderr || '').trim();
+  if (p.status !== 0) throw new Error(`${r.name} failed: ${(err || p.stdout || '').split('\n').slice(-3).join(' | ')}`);
+  /* resvg exits 0 and draws no text when it finds no font; never let that pass as an export */
+  if (/No match for|No fonts? (were )?(found|loaded)|failed to load font/i.test(err)) {
+    throw new Error(`${r.name} found no usable font, so the text would be missing: ${err.split('\n')[0]}. ${FONT_HINT}`);
+  }
 };
+export const FONT_HINT = 'Install a font (nix profile install nixpkgs#liberation_ttf, or apt install fonts-liberation) or point CLEAN_DIAGRAMS_FONT_DIR at a folder of .ttf files';
 export const renderPng = (r, input, output, scale = 2) => run(r, r.png(input, output, scale));
 export const renderPdf = (r, input, output) => run(r, r.pdf(input, output));
 export const INSTALL_HINT = 'install resvg (PNG) or librsvg (PNG and PDF): nix profile install nixpkgs#resvg nixpkgs#librsvg, or brew install resvg librsvg';

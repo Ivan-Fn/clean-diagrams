@@ -62,8 +62,12 @@ large screens. Keep the dark PNG for dark slide templates.
 Without a browser, PNGs come from `resvg` (closest to the browser render) or
 `rsvg-convert`, and PDFs from `rsvg-convert`, whichever is on PATH. Install them with
 `nix profile install nixpkgs#resvg nixpkgs#librsvg` or `brew install resvg librsvg`, or
-pick one with `CLEAN_DIAGRAMS_RENDERER=resvg`. They use the machine's fonts: Helvetica or
-Arial where the browser would use the system font, and bold where it would use semibold.
+pick one with `CLEAN_DIAGRAMS_RENDERER=resvg`. They draw with the machine's fonts: Helvetica
+Neue on a Mac, Liberation Sans or DejaVu Sans on most Linux machines, where a browser on a
+Mac uses the system font. Names come out bold where a browser draws semibold. A machine
+with no usable font makes the export fail with a message, never a picture without text;
+install one (`nix profile install nixpkgs#liberation_ttf`) or point
+`CLEAN_DIAGRAMS_FONT_DIR` at a folder of `.ttf` files.
 
 ## Papers and print
 

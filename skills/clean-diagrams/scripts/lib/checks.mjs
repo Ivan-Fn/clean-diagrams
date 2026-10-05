@@ -40,14 +40,18 @@ export function geometryProblems(m) {
     if (t.r.x < 8 || t.r.r > W - 8 || t.r.y < 4 || t.r.b > H - 4) add('fail', 'text-out-of-frame', t.where, `"${t.label}" reaches ${Math.round(t.r.r)} of ${W} wide / ${Math.round(t.r.b)} of ${H} high; keep 8 clear`);
     const s = t.owner && byId.get(t.owner);
     if (s) {
-      if (!contains(s.r, t.r, s.kind === 'node' ? 8 : 4, 3)) {
-        add('fail', 'text-outside-box', `#${s.id}`, `"${t.label}" is ${Math.ceil(t.r.w)} wide and does not fit inside its box (${Math.round(s.r.w)}x${Math.round(s.r.h)}); widen the box to at least ${Math.ceil(t.r.w + 16)}, break the line, or move it`);
+      const dx = s.kind === 'node' ? 8 : 4, dy = 3;
+      if (!contains(s.r, t.r, dx, dy)) {
+        const wide = t.r.x < s.r.x + dx || t.r.r > s.r.r - dx;
+        const fix = wide ? `widen the box to at least ${Math.ceil(t.r.w + 2 * dx)}, break the line, or move it`
+          : `make the box taller or move the line: its text spans ${Math.round(t.r.y)} to ${Math.round(t.r.b)}, the box ${Math.round(s.r.y)} to ${Math.round(s.r.b)}`;
+        add('fail', 'text-outside-box', `#${s.id}`, `"${t.label}" (${Math.ceil(t.r.w)}x${Math.ceil(t.r.h)}) does not fit inside its box (${Math.round(s.r.w)}x${Math.round(s.r.h)}); ${fix}`);
       }
     } else {
       for (const n of m.shapes) {
         if (overlap(t.r, n.r) && !contains(n.r, t.r)) add('fail', 'text-on-border', t.where, `"${t.label}" crosses the border of #${n.id}`);
         else if (n.kind === 'node' && contains(n.r, t.r)) add('fail', 'loose-text-in-box', t.where, `"${t.label}" sits inside #${n.id} but is not in its <g class="node">`);
-        else if (n.kind === 'node' && overlap({ x: t.r.x - 4, y: t.r.y - 2, r: t.r.r + 4, b: t.r.b + 2 }, n.r)) add('fail', 'label-crowding', t.where, `"${t.label}" is less than 4 from #${n.id}; move it into a wider gap or above the row`);
+        else if (n.kind === 'node' && overlap({ x: t.r.x - 4, y: t.r.y - 4, r: t.r.r + 4, b: t.r.b + 4 }, n.r)) add('fail', 'label-crowding', t.where, `"${t.label}" is less than 4 from #${n.id}; move it into a wider gap or above the row`);
       }
     }
   }

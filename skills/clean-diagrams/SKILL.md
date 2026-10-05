@@ -47,7 +47,9 @@ install. Optional extras, used automatically when present:
    `diagram.check-light.png` and `diagram.check-dark.png` from the output folder and ask
    whether the title's claim is visible at a glance. Repeat until both are true. The last
    line says what checked the file and made the previews; without a browser or a renderer
-   there are no PNG previews, and the checks alone decide.
+   there are no PNG previews, and the checks alone decide. Without a browser the checker
+   measures text with the widest of the common fonts, so it may ask for a box a few units
+   wider than a browser would; widen it.
 5. **Export for where it is going** ([references/publish.md](references/publish.md)):
 
    | Destination | Command | Output |

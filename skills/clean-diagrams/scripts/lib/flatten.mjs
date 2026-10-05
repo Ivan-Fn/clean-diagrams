@@ -14,14 +14,20 @@ const KEEP_ATTRS = new Set(['xmlns', 'xmlns:xlink', 'viewBox', 'width', 'height'
   'dx', 'dy', 'transform']);
 const SHAPE = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'opacity'];
 const DRAWN = new Set(['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path']);
-const TEXT = ['font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'letter-spacing'];
+const TEXT = ['font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'letter-spacing', 'dominant-baseline', 'alignment-baseline'];
+const MARKERS = ['marker-start', 'marker-mid', 'marker-end'];
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /* Browser-only font keywords mean nothing to other renderers; drop them so the list falls
    through to a family the machine has. */
 const portableFonts = (f) => {
   const list = f.split(',').map((s) => s.trim()).filter((s) => !/^(ui-sans-serif|-apple-system|BlinkMacSystemFont|system-ui)$/i.test(s.replace(/["']/g, '')));
-  return list.length ? list.join(', ') : 'Helvetica, Arial, sans-serif';
+  /* Fonts most Linux machines have, before the generic family, so a renderer without
+     Arial still finds a face instead of drawing no text. */
+  const generic = list.findIndex((s) => /^(sans-serif|serif|monospace)$/i.test(s));
+  const extra = ['"Liberation Sans"', '"DejaVu Sans"', '"Noto Sans"'].filter((x) => !list.includes(x));
+  if (generic >= 0) list.splice(generic, 0, ...extra); else list.push(...extra, 'sans-serif');
+  return list.join(', ');
 };
 
 export function flatten(src, theme) {
@@ -34,7 +40,8 @@ export function flatten(src, theme) {
     const out = [];
     for (const [k, v] of Object.entries(el.attrs)) if (KEEP_ATTRS.has(k) || k.startsWith('data-') || k.startsWith('aria-')) out.push(`${k}="${esc(v)}"`);
     const cs = el.cs || {};
-    const props = el.tag === 'text' || el.tag === 'tspan' ? [...SHAPE, ...TEXT] : DRAWN.has(el.tag) ? SHAPE : [];
+    const props = el.tag === 'text' || el.tag === 'tspan' ? [...SHAPE, ...TEXT] : DRAWN.has(el.tag) ? [...SHAPE, ...MARKERS] : el.tag === 'g' ? ['opacity'] : [];
+    if (el.hidden && !el.parent?.hidden) out.push('display="none"');
     for (const p of props) {
       let v = cs[p];
       if (v == null || v === '') continue;
@@ -45,6 +52,9 @@ export function flatten(src, theme) {
       if (p === 'font-weight' && parseFloat(v) >= 600) v = 'bold';
       if (p === 'stroke-dasharray' && v === 'none') continue;
       if ((p === 'opacity' || p === 'fill-opacity' || p === 'stroke-opacity') && Number(v) === 1) continue;
+      if (MARKERS.includes(p) && (v === 'none' || el.attrs[p] != null)) continue;
+      if ((p === 'dominant-baseline' || p === 'alignment-baseline') && (v === 'auto' || v === 'baseline')) continue;
+      if (p === 'letter-spacing' && v === 'normal') continue;
       out.push(`${p}="${esc(v)}"`);
     }
     const inner = el.children.map(write).join('');

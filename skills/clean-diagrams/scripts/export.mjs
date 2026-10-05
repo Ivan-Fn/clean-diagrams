@@ -51,7 +51,7 @@ if (!vb) { console.error('the SVG has no viewBox'); process.exit(1); }
 const [W, H] = [Math.ceil(vb.w), Math.ceil(vb.h)];
 const DARK_QUERY = /@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)/;
 if (!DARK_QUERY.test(source)) console.warn('note: no prefers-color-scheme block found; the dark outputs will match the light ones');
-const written = [], skipped = [];
+const written = [], skipped = [], failed = [];
 
 if (want('--split')) {
   /* The dark block follows the base rule, so enabling it unconditionally gives the dark
@@ -109,17 +109,21 @@ if (want('--png') || want('--pdf')) {
       if (!r) skipped.push(`PNG: no browser and no renderer; ${INSTALL_HINT}`);
       else for (const theme of ['light', 'dark']) {
         const out = join(outDir, theme === 'light' ? `${name}.png` : `${name}.dark.png`);
-        renderPng(r, flat[theme], out, scale);
-        written.push(out);
+        try { renderPng(r, flat[theme], out, scale); written.push(out); } catch (e) { failed.push(`PNG: ${e.message}`); break; }
       }
     }
     if (want('--pdf')) {
       const r = findRenderer('pdf');
       if (!r) skipped.push(`PDF: no browser and no PDF renderer; install librsvg (rsvg-convert): nix profile install nixpkgs#librsvg, or brew install librsvg`);
-      else { const out = join(outDir, `${name}.pdf`); renderPdf(r, flat.light, out); written.push(out); }
+      else {
+        const out = join(outDir, `${name}.pdf`);
+        try { renderPdf(r, flat.light, out); written.push(out); } catch (e) { failed.push(`PDF: ${e.message}`); }
+      }
     }
   }
 }
 
 for (const f of written) console.log(f);
 for (const s of skipped) console.error(`skipped ${s}`);
+for (const f of failed) console.error(`FAILED ${f}`);
+process.exit(failed.length ? 1 : 0);

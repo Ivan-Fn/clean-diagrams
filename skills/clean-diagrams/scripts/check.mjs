@@ -66,8 +66,12 @@ const MEASURE_IN_PAGE = (fallbackFont) => {
     if (g.id && rect) shapes.push({ id: g.id, kind: g.classList.contains('node') ? 'node' : 'group', r: box(rect.getBBox()) });
   }
   const painted = [...svg.querySelectorAll('rect, circle, ellipse, polygon, path')].filter((el) => !el.closest('defs, marker') && !el.classList.contains('edge'));
-  const texts = [...svg.querySelectorAll('text')].filter((t) => !t.closest('defs, marker') && label(t)).map((t) => {
+  /* opacity multiplies down the tree; getComputedStyle reports only the element's own */
+  const op = (el) => { let o = 1; for (let p = el; p && p !== svg.parentNode; p = p.parentNode) if (p.nodeType === 1) o *= parseFloat(getComputedStyle(p).opacity); return o; };
+  const visible = (el) => !el.checkVisibility || el.checkVisibility({ visibilityProperty: true });
+  const texts = [...svg.querySelectorAll('text')].filter((t) => !t.closest('defs, marker') && label(t) && visible(t)).map((t) => {
     const cs = getComputedStyle(t), r = box(t.getBBox());
+    const size = Math.min(parseFloat(cs.fontSize), ...[...t.querySelectorAll('tspan')].map((s) => parseFloat(getComputedStyle(s).fontSize)));
     const c = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
     let bg = { r: 255, g: 255, b: 255, a: 1 };
     for (const el of painted) {
@@ -76,18 +80,19 @@ const MEASURE_IN_PAGE = (fallbackFont) => {
       const bb = box(el.getBBox());
       if (!(c.x > bb.x && c.x < bb.r && c.y > bb.y && c.y < bb.b)) continue;
       if (el.tagName !== 'rect' && !(el.isPointInFill && el.isPointInFill(Object.assign(svg.createSVGPoint(), c)))) continue;
-      bg = blend({ ...fill, a: fill.a * parseFloat(ps.fillOpacity) * parseFloat(ps.opacity) }, bg);
+      bg = blend({ ...fill, a: fill.a * parseFloat(ps.fillOpacity) * op(el) }, bg);
     }
     const fg = rgba(cs.fill);
     const own = t.closest('g.node, g.group');
-    return { label: label(t), where: where(t), owner: own && own.id ? own.id : null, r, size: parseFloat(cs.fontSize), weight: parseInt(cs.fontWeight, 10),
+    return { label: label(t), where: where(t), owner: own && own.id ? own.id : null, r, size, weight: parseInt(cs.fontWeight, 10),
       outlined: !!cs.stroke && cs.stroke !== 'none' && parseFloat(cs.strokeWidth) > 0, stroke: cs.stroke,
-      fg: fg ? { ...fg, a: fg.a * parseFloat(cs.fillOpacity) } : null, bg };
+      fg: fg ? { ...fg, a: fg.a * parseFloat(cs.fillOpacity) * op(t) } : null, bg };
   });
   const edges = [...svg.querySelectorAll('path.edge')].map((e) => {
     const len = e.getTotalLength();
     const pt = (d) => { const p = e.getPointAtLength(d); return { x: p.x, y: p.y }; };
-    return { id: e.id, from: e.dataset.from || '', to: e.dataset.to || '', head: !!e.getAttribute('marker-end'), plain: e.classList.contains('plain'),
+    const me = getComputedStyle(e).markerEnd;
+    return { id: e.id, from: e.dataset.from || '', to: e.dataset.to || '', head: !!e.getAttribute('marker-end') || (!!me && me !== 'none'), plain: e.classList.contains('plain'),
       len, P0: pt(0), P1: pt(len), samples: steps(len).map(pt) };
   });
   return { W: vb.width, H: vb.height, shapes, texts, edges };
@@ -151,9 +156,11 @@ if (outDir && previews === 'none' && dims) {
   for (const theme of ['light', 'dark']) {
     const flat = join(outDir, `${NAME}.check-${theme}.svg`);
     writeFileSync(flat, flatten(SRC, theme));
-    if (renderer) renderPng(renderer, flat, join(outDir, `${NAME}.check-${theme}.png`), 2);
+    if (renderer) {
+      try { renderPng(renderer, flat, join(outDir, `${NAME}.check-${theme}.png`), 2); } catch (e) { previews = `none: ${e.message}`; }
+    }
   }
-  previews = renderer ? renderer.name : 'flattened SVG only (install resvg or librsvg for PNG previews)';
+  if (previews === 'none') previews = renderer ? renderer.name : 'flattened SVG only (install resvg or librsvg for PNG previews)';
 }
 
 const fails = all.filter((p) => p.level === 'fail');

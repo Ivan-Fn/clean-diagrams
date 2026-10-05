@@ -46,14 +46,16 @@ const read = (theme) => {
     dash: el.cs['stroke-dasharray'] && el.cs['stroke-dasharray'] !== 'none' ? el.cs['stroke-dasharray'].replace(/px/g, '').replace(/,\s*/g, ' ').trim() : '' });
   const txt = (t) => ({ s: textOf(t).trim().replace(/\s+/g, ' '), size: num(t.cs['font-size'], 16), weight: weight(t.cs['font-weight']),
     color: toHex(t.cs.fill), anchor: t.cs['text-anchor'], box: bb(textBox(t)), x: num(t.attrs.x), y: num(t.attrs.y), cls: t.attrs.class || '' });
-  const shapes = all.filter(isShape).filter((g) => g.attrs.id).map((g) => {
+  const shapes = all.filter(isShape).filter((g) => g.attrs.id && g.children.some((c) => c.tag === 'rect')).map((g) => {
     const rect = g.children.find((c) => c.tag === 'rect');
     return { id: g.attrs.id, kind: hasClass(g, 'node') ? 'node' : 'group', rect: bb(rectBox(rect)), rx: num(rect.attrs.rx),
       paint: paint(rect), texts: elements(g).filter((e) => e.tag === 'text' && textOf(e).trim()).map(txt) };
   });
-  const edges = all.filter((e) => e.tag === 'path' && hasClass(e, 'edge')).map((p) => {
-    const pts = pathPoints(p.attrs.d || ''), len = polyLength(pts), n = Math.max(2, Math.ceil(len / 4));
-    return { id: p.attrs.id, from: p.attrs['data-from'], to: p.attrs['data-to'], d: p.attrs.d, paint: paint(p), mid: pointAt(pts, len / 2),
+  const edges = all.filter((e) => e.tag === 'path' && hasClass(e, 'edge')).map((p, i) => {
+    let pts;
+    try { pts = pathPoints(p.attrs.d || ''); } catch (err) { throw new Error(`arrow ${p.attrs.id || i + 1}: ${err.message}. Run check.mjs first.`); }
+    const len = polyLength(pts), n = Math.max(2, Math.ceil(len / 4));
+    return { id: p.attrs.id || `edge-${i + 1}`, from: p.attrs['data-from'], to: p.attrs['data-to'], d: p.attrs.d, paint: paint(p), mid: pointAt(pts, len / 2),
       head: !!p.attrs['marker-end'], samples: Array.from({ length: n }, (_, i) => pointAt(pts, (len * i) / (n - 1))) };
   });
   const free = all.filter((t) => t.tag === 'text' && textOf(t).trim() && !closest(t, isShape)).map(txt);
@@ -61,7 +63,8 @@ const read = (theme) => {
   const title = all.find((e) => e.tag === 'text' && hasClass(e, 'title'));
   return { W: vb.w, H: vb.h, shapes, edges, free, loose, title: title ? textOf(title).trim() : '' };
 };
-const model = { light: read('light'), dark: read('dark') };
+let model;
+try { model = { light: read('light'), dark: read('dark') }; } catch (e) { console.error(`to-drawio: ${e.message}`); process.exit(1); }
 const L = model.light, D = model.dark;
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -184,7 +187,7 @@ for (const e of L.edges) {
     st.fontSize = n(first.size);
     st.fontFamily = 'Helvetica';
     st.labelBackgroundColor = 'none';
-    st.align = first.anchor === 'end' ? 'right' : first.anchor === 'start' ? 'left' : 'center';
+    st.align = 'center';                    /* the offset below already places the label's centre */
     value = PLAIN ? labels.map(({ t }) => t.s).join('\n')
       : labels.map(({ t }) => (t.weight >= 600 ? `<b>${html(t.s)}</b>` : html(t.s))).join('<br>');
     if (PLAIN && first.weight >= 600) st.fontStyle = 1;

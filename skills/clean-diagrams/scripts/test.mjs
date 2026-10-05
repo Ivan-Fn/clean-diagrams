@@ -63,6 +63,10 @@ const cases = [
   ['straddles-group', 'groups.svg', '<rect class="box tint" x="40" y="100"', '<rect class="box tint" x="10" y="100"'],
   ['duplicate-id', 'flow.svg', '<g class="node" id="gateway">', '<g class="node" id="browser">'],
   ['viewbox', 'flow.svg', 'viewBox="0 0 760 262" ', ''],
+  ['xml', 'flow.svg', '>auth, rate limits<', '>auth & rate limits<'],
+  ['text-outside-box', 'flow.svg', '<text class="note" x="94" y="108">single-page app</text>', '<text class="note" x="94" y="108"><tspan x="94" y="108">single-page app</tspan><tspan x="94" dy="16">served from a CDN</tspan></text>'],
+  ['contrast', 'flow.svg', '<g class="node" id="orders">', '<g class="node" id="orders" opacity="0.35">'],
+  ['css-selector', 'flow.svg', '.note { font-size: 13px;', '.note:first-child { font-size: 13px; } .note { font-size: 13px;'],
 ];
 for (const [check, tpl, find, replace] of cases) {
   let p;
@@ -90,6 +94,19 @@ if (outs.every(existsSync)) {
   result(lightSvg.includes('@media not all') && darkSvg.includes('@media all'), 'split SVGs fix the theme');
   const chk = run('check.mjs', [outs[4], '--quiet']);
   result(chk.code === 0, 'the fixed dark SVG still passes the checks', chk.code ? chk.out.trim() : '');
+}
+
+/* 3b. export without a browser: renderer output when one is on PATH, a clear skip otherwise */
+{
+  const nb = join(WORK, 'nobrowser');
+  const r = run('export.mjs', [src, '--out', nb], { CLEAN_DIAGRAMS_BROWSER: 'none' });
+  const flatOk = ['before-after.flat.svg', 'before-after.flat.dark.svg', 'before-after.light.svg'].every((f) => existsSync(join(nb, f)));
+  const flat = flatOk ? readFileSync(join(nb, 'before-after.flat.svg'), 'utf8') : '';
+  result(r.code === 0 && flatOk && !flat.includes('var(') && !flat.includes('<style'), 'export without a browser writes flattened SVGs with no CSS left', r.code ? r.out : '');
+  const png = existsSync(join(nb, 'before-after.png')), pdf = existsSync(join(nb, 'before-after.pdf'));
+  const skippedPng = /skipped PNG/.test(r.out), skippedPdf = /skipped PDF/.test(r.out);
+  result((png || skippedPng) && (pdf || skippedPdf), `export without a browser: PNG ${png ? 'written' : 'skipped with a note'}, PDF ${pdf ? 'written' : 'skipped with a note'}`, r.out.trim().split('\n').slice(-2).join(' | '));
+  if (png) result(readFileSync(join(nb, 'before-after.png')).readUInt32BE(16) === 1520, 'renderer PNG is 2x the viewBox width');
 }
 
 /* 4. draw.io conversion and the round trip through extract */
