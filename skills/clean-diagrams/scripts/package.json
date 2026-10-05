@@ -2,8 +2,11 @@
   "name": "clean-diagrams-scripts",
   "private": true,
   "type": "module",
-  "description": "Checks and exports for the clean-diagrams skill. Install once here; the scripts then work on a diagram anywhere on disk.",
-  "engines": { "node": ">=20" },
-  "scripts": { "postinstall": "playwright install chromium", "test": "node test.mjs" },
-  "dependencies": { "playwright": "1.59.1" }
+  "description": "Checks and exports for the clean-diagrams skill. They run on Node alone; Playwright is optional and adds render-based checks when a browser is available.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node test.mjs",
+    "browser": "playwright install chromium"
+  },
+  "optionalDependencies": { "playwright": "1.59.1" }
 }

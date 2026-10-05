@@ -1,6 +1,6 @@
 ---
 name: clean-diagrams
-description: Draws clean architecture and flow diagrams as standalone SVG files (flat boxes, thin grey borders, one accent colour, labelled arrows, automatic light and dark themes), checks them for layout defects, and exports PNG, PDF and editable draw.io files. Also redraws an existing Mermaid, draw.io or Excalidraw diagram in this style. Use when asked for an architecture, system, flow, data-flow, pipeline, before-and-after or comparison diagram, a diagram for a README, docs page, slide deck or paper, or to make an existing diagram look better.
+description: Draws clean architecture and flow diagrams as standalone SVG files (flat boxes, thin grey borders, one accent colour, labelled arrows, automatic light and dark themes), checks them for layout defects with Node alone (no browser needed), and exports PNG, PDF and editable draw.io files. Also redraws an existing Mermaid, draw.io or Excalidraw diagram in this style. Use when asked for an architecture, system, flow, data-flow, pipeline, before-and-after or comparison diagram, a diagram for a README, docs page, slide deck or paper, or to make an existing diagram look better.
 license: MIT
 ---
 
@@ -10,11 +10,16 @@ Each diagram is one hand-written SVG file. That file is the source: it renders o
 in MkDocs and in browsers, follows the reader's light or dark theme by itself, and every
 other format is generated from it.
 
-Scripts live in `scripts/` next to this file. Install them once:
+Scripts live in `scripts/` next to this file and run on Node 18 or later with nothing to
+install. Optional extras, used automatically when present:
 
-```bash
-cd <this skill>/scripts && npm install      # Playwright and its Chromium, about 100 MB
-```
+- `resvg` or `rsvg-convert` on PATH: PNG and PDF exports and preview images without a
+  browser (`nix profile install nixpkgs#resvg nixpkgs#librsvg`, or `brew install resvg librsvg`).
+- A browser, for a second, render-based check pass: `npm install` in `scripts/` adds
+  Playwright, which uses installed Chrome or Edge, or `npm run browser` for its own
+  Chromium. To use a Chrome you started with `--remote-debugging-port=9222`, set
+  `CLEAN_DIAGRAMS_BROWSER=http://127.0.0.1:9222`. `CLEAN_DIAGRAMS_BROWSER=none` turns the
+  browser off.
 
 ## Workflow
 
@@ -40,7 +45,9 @@ cd <this skill>/scripts && npm install      # Playwright and its Chromium, about
    ```
    Fix every `FAIL` line; each one names the element and the fix. Then open
    `diagram.check-light.png` and `diagram.check-dark.png` from the output folder and ask
-   whether the title's claim is visible at a glance. Repeat until both are true.
+   whether the title's claim is visible at a glance. Repeat until both are true. The last
+   line says what checked the file and made the previews; without a browser or a renderer
+   there are no PNG previews, and the checks alone decide.
 5. **Export for where it is going** ([references/publish.md](references/publish.md)):
 
    | Destination | Command | Output |
@@ -49,11 +56,13 @@ cd <this skill>/scripts && npm install      # Playwright and its Chromium, about
    | Markdown with a `<picture>` element | `node scripts/export.mjs diagram.svg --split` | `diagram.light.svg`, `diagram.dark.svg` |
    | Slides, chat, documents | `node scripts/export.mjs diagram.svg --png` | `diagram.png`, `diagram.dark.png` at 2x |
    | Papers, print | `node scripts/export.mjs diagram.svg --pdf` | `diagram.pdf`, vector, fonts embedded |
+   | PowerPoint, Keynote, Inkscape, LaTeX `svg` package | `node scripts/export.mjs diagram.svg --flat` | `diagram.flat.svg`, `diagram.flat.dark.svg` |
    | Editable in draw.io | `node scripts/to-drawio.mjs diagram.svg` | `diagram.drawio` |
    | One file GitHub shows and draw.io edits | `node scripts/to-drawio.mjs diagram.svg --export` | `diagram.drawio.svg`, `diagram.drawio.png` (needs draw.io desktop) |
 
    `export.mjs` with no format flag writes all of its outputs; `--scale 3` makes larger
-   PNGs. Keep the SVG next to its exports and regenerate them from it. Never hand-edit an
+   PNGs. PNG and PDF need a browser or a renderer (see above) and are skipped with a note
+   when there is neither. Keep the SVG next to its exports and regenerate them from it. Never hand-edit an
    export.
 
 ## Redrawing an existing diagram
@@ -94,8 +103,8 @@ user marks as important. Tell the user anything you merged, renamed or dropped.
 | `templates/hub.svg` | Several inputs into one component, several outputs from it |
 | `templates/groups.svg` | Stages or zones as containers holding smaller items |
 | `templates/before-after.svg` | An approved path in green and a new path in red, with a legend |
-| `scripts/check.mjs` | Layout, text-fit, arrow and contrast checks in light, dark and a fallback font |
-| `scripts/export.mjs` | PNG, PDF and fixed-theme SVG exports |
+| `scripts/check.mjs` | Layout, text-fit, arrow and contrast checks in light and dark, with Node alone; a browser adds a render pass |
+| `scripts/export.mjs` | PNG, PDF, fixed-theme and flattened SVG exports |
 | `scripts/to-drawio.mjs` | SVG to an editable `.drawio` file, optionally exported by draw.io |
 | `scripts/extract.mjs` | Outline of a draw.io or Excalidraw file, for redrawing |
 | `scripts/test.mjs` | Proves the templates pass and that each check catches its defect |

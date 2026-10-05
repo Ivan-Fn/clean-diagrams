@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TPL = resolve(HERE, '..', 'templates');
 const WORK = mkdtempSync(join(tmpdir(), 'clean-diagrams-test-'));
-const run = (script, args) => {
-  const r = spawnSync(process.execPath, [join(HERE, script), ...args], { encoding: 'utf8' });
+const run = (script, args, env = {}) => {
+  const r = spawnSync(process.execPath, [join(HERE, script), ...args], { encoding: 'utf8', env: { ...process.env, ...env } });
   return { code: r.status, out: `${r.stdout || ''}${r.stderr || ''}` };
 };
 let failed = 0, n = 0;
@@ -67,9 +67,13 @@ const cases = [
 for (const [check, tpl, find, replace] of cases) {
   let p;
   try { p = broken(tpl, find, replace); } catch (e) { result(false, `check ${check}`, e.message); continue; }
-  const r = run('check.mjs', [p]);
-  const fired = r.out.split('\n').some((l) => l.startsWith('FAIL') && l.split(/\s+/)[1] === check);
-  result(r.code === 1 && fired, `check ${check} catches its defect`, fired ? '' : `exit ${r.code}; output: ${r.out.trim().split('\n').slice(0, 3).join(' | ')}`);
+  /* once as configured, and once with the browser switched off: the no-browser checker
+     must catch every defect on its own */
+  for (const [mode, env] of [['', {}], [' without a browser', { CLEAN_DIAGRAMS_BROWSER: 'none' }]]) {
+    const r = run('check.mjs', [p], env);
+    const fired = r.out.split('\n').some((l) => l.startsWith('FAIL') && l.split(/\s+/)[1] === check);
+    result(r.code === 1 && fired, `check ${check} catches its defect${mode}`, fired ? '' : `exit ${r.code}; output: ${r.out.trim().split('\n').slice(0, 3).join(' | ')}`);
+  }
 }
 
 /* 3. exports */

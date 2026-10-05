@@ -38,6 +38,18 @@ Reference the SVG as an image, as above. MkDocs Material also accepts the `<pict
 element. Avoid pasting the SVG inline into the page: the page's own styles then reach into
 the drawing.
 
+## Tools that draw the SVG black
+
+rsvg-convert and resvg do not support CSS variables or media queries: given the source
+SVG, rsvg-convert draws it solid black and resvg refuses the colours. Most tools outside a
+browser behave the same way, including office suites, vector editors and LaTeX's `svg`
+package (not each one tested). Give them the flattened copy, which has every colour
+written into the elements:
+
+```bash
+node scripts/export.mjs diagram.svg --flat     # diagram.flat.svg, diagram.flat.dark.svg
+```
+
 ## Slides and documents
 
 ```bash
@@ -46,6 +58,12 @@ node scripts/export.mjs diagram.svg --png --scale 3
 
 writes `diagram.png` (light) and `diagram.dark.png`. Use scale 3 for slides projected on
 large screens. Keep the dark PNG for dark slide templates.
+
+Without a browser, PNGs come from `resvg` (closest to the browser render) or
+`rsvg-convert`, and PDFs from `rsvg-convert`, whichever is on PATH. Install them with
+`nix profile install nixpkgs#resvg nixpkgs#librsvg` or `brew install resvg librsvg`, or
+pick one with `CLEAN_DIAGRAMS_RENDERER=resvg`. They use the machine's fonts: Helvetica or
+Arial where the browser would use the system font, and bold where it would use semibold.
 
 ## Papers and print
 
