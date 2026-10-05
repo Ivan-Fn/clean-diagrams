@@ -1,0 +1,9 @@
+{
+  "name": "clean-diagrams-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Checks and exports for the clean-diagrams skill. Install once here; the scripts then work on a diagram anywhere on disk.",
+  "engines": { "node": ">=20" },
+  "scripts": { "postinstall": "playwright install chromium", "test": "node test.mjs" },
+  "dependencies": { "playwright": "1.59.1" }
+}

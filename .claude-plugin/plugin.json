@@ -1,0 +1,10 @@
+{
+  "name": "clean-diagrams",
+  "version": "0.1.0",
+  "description": "Clean architecture and flow diagrams as standalone SVG, with layout checks and PNG, PDF and editable draw.io exports. Redraws Mermaid, draw.io and Excalidraw diagrams in the same style.",
+  "author": { "name": "Ivan Fofanov" },
+  "homepage": "https://github.com/Ivan-Fn/clean-diagrams",
+  "repository": "https://github.com/Ivan-Fn/clean-diagrams",
+  "license": "MIT",
+  "keywords": ["diagram", "architecture", "svg", "drawio", "mermaid", "excalidraw", "documentation"]
+}

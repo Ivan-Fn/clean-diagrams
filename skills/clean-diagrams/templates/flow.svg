@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 262" width="760" height="262" role="img" aria-label="Reads go to the cache first, and only a miss reaches the database">
+  <style>
+    svg { --bg:#ffffff; --ink:#0e0e0e; --quiet:#484745; --line:#bbbaaf; --tint:#f3f2ee;
+          --accent:#266dcc; --accent-soft:#e5edf9; --good:#169824; --good-soft:#e3f3e5;
+          --bad:#c93537; --bad-soft:#f8e7e7; --warn:#a15c00; --warn-soft:#fbefd9;
+          font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg:#1f1e1d; --ink:#f2f1ec; --quiet:#b8b6ad; --line:#6b6962; --tint:#2a2927;
+            --accent:#6ea6ee; --accent-soft:#1d2a3c; --good:#5cc06a; --good-soft:#1c3020;
+            --bad:#f07373; --bad-soft:#3a2020; --warn:#e5a54b; --warn-soft:#382a14; }
+    }
+    .bg { fill: var(--bg); }
+    .title { font-size: 15px; font-weight: 600; fill: var(--ink); }
+    .box { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    .box.tint { fill: var(--tint); }
+    .box.accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+    .box.good { fill: var(--good-soft); stroke: var(--good); stroke-width: 2; }
+    .box.bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 2; }
+    .box.warn { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 2; }
+    .name { font-size: 15px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
+    .note { font-size: 13px; fill: var(--quiet); text-anchor: middle; }
+    .label { font-size: 11.5px; fill: var(--quiet); }
+    .label.strong { font-weight: 600; fill: var(--ink); }
+    .label.bad { fill: var(--bad); } .label.good { fill: var(--good); } .label.accent { fill: var(--accent); }
+    .label.bad.strong, .label.good.strong, .label.accent.strong { font-weight: 600; }
+    .item { font-size: 13px; fill: var(--ink); text-anchor: middle; }
+    rect.group { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    rect.group.dashed { stroke-dasharray: 6 5; }
+    rect.group.tint { fill: var(--tint); stroke: none; }
+    .group-name { font-size: 14px; font-weight: 600; fill: var(--quiet); }
+    .group-name.accent { fill: var(--accent); }
+    .edge { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    .edge.accent { stroke: var(--accent); stroke-width: 2; }
+    .edge.good { stroke: var(--good); stroke-width: 2; }
+    .edge.bad { stroke: var(--bad); stroke-width: 2; }
+    .edge.dashed { stroke-dasharray: 5 4; }
+    .head { fill: var(--line); } .head.accent { fill: var(--accent); }
+    .head.good { fill: var(--good); } .head.bad { fill: var(--bad); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head accent" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head good" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head bad" d="M0 0L10 5L0 10z"/></marker>
+  </defs>
+  <rect class="bg" width="760" height="262"/>
+
+  <text class="title" x="24" y="34">Reads go to the cache first, and only a miss reaches the database</text>
+
+  <!-- row A: boxes 140 wide, 50 apart, centre line y=94 -->
+  <g class="node" id="browser">
+    <rect class="box" x="24" y="66" width="140" height="56" rx="8"/>
+    <text class="name" x="94" y="90">Browser</text>
+    <text class="note" x="94" y="108">single-page app</text>
+  </g>
+  <g class="node" id="gateway">
+    <rect class="box" x="214" y="66" width="140" height="56" rx="8"/>
+    <text class="name" x="284" y="90">API gateway</text>
+    <text class="note" x="284" y="108">auth, rate limits</text>
+  </g>
+  <g class="node" id="orders">
+    <rect class="box" x="404" y="66" width="140" height="56" rx="8"/>
+    <text class="name" x="474" y="90">Orders service</text>
+    <text class="note" x="474" y="108">3 replicas</text>
+  </g>
+  <g class="node" id="cache">
+    <rect class="box accent" x="594" y="66" width="140" height="56" rx="8"/>
+    <text class="name" x="664" y="90">Cache</text>
+    <text class="note" x="664" y="108">60-second TTL</text>
+  </g>
+
+  <!-- row B -->
+  <g class="node" id="database">
+    <rect class="box" x="594" y="182" width="140" height="56" rx="8"/>
+    <text class="name" x="664" y="206">Database</text>
+    <text class="note" x="664" y="224">primary + replica</text>
+  </g>
+
+  <g class="edges">
+    <path class="edge" id="e-browser-gateway" data-from="browser" data-to="gateway" d="M164 94H214" marker-end="url(#arrow)"/>
+    <path class="edge" id="e-gateway-orders" data-from="gateway" data-to="orders" d="M354 94H404" marker-end="url(#arrow)"/>
+    <path class="edge accent" id="e-orders-cache" data-from="orders" data-to="cache" d="M544 94H594" marker-end="url(#arrow-accent)"/>
+    <path class="edge dashed" id="e-cache-database" data-from="cache" data-to="database" d="M664 122V182" marker-end="url(#arrow)"/>
+  </g>
+  <text class="label" x="189" y="86" text-anchor="middle">HTTPS</text>
+  <text class="label" x="379" y="86" text-anchor="middle">/orders</text>
+  <text class="label" x="569" y="86" text-anchor="middle">read</text>
+  <text class="label" x="672" y="156">on miss</text>
+</svg>

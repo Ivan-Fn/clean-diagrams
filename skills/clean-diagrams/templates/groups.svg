@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 276" width="760" height="276" role="img" aria-label="Every release passes three stages before it reaches all users">
+  <style>
+    svg { --bg:#ffffff; --ink:#0e0e0e; --quiet:#484745; --line:#bbbaaf; --tint:#f3f2ee;
+          --accent:#266dcc; --accent-soft:#e5edf9; --good:#169824; --good-soft:#e3f3e5;
+          --bad:#c93537; --bad-soft:#f8e7e7; --warn:#a15c00; --warn-soft:#fbefd9;
+          font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg:#1f1e1d; --ink:#f2f1ec; --quiet:#b8b6ad; --line:#6b6962; --tint:#2a2927;
+            --accent:#6ea6ee; --accent-soft:#1d2a3c; --good:#5cc06a; --good-soft:#1c3020;
+            --bad:#f07373; --bad-soft:#3a2020; --warn:#e5a54b; --warn-soft:#382a14; }
+    }
+    .bg { fill: var(--bg); }
+    .title { font-size: 15px; font-weight: 600; fill: var(--ink); }
+    .box { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    .box.tint { fill: var(--tint); }
+    .box.accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+    .box.good { fill: var(--good-soft); stroke: var(--good); stroke-width: 2; }
+    .box.bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 2; }
+    .box.warn { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 2; }
+    .name { font-size: 15px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
+    .note { font-size: 13px; fill: var(--quiet); text-anchor: middle; }
+    .label { font-size: 11.5px; fill: var(--quiet); }
+    .label.strong { font-weight: 600; fill: var(--ink); }
+    .label.bad { fill: var(--bad); } .label.good { fill: var(--good); } .label.accent { fill: var(--accent); }
+    .label.bad.strong, .label.good.strong, .label.accent.strong { font-weight: 600; }
+    .item { font-size: 13px; fill: var(--ink); text-anchor: middle; }
+    rect.group { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    rect.group.dashed { stroke-dasharray: 6 5; }
+    rect.group.tint { fill: var(--tint); stroke: none; }
+    .group-name { font-size: 14px; font-weight: 600; fill: var(--quiet); }
+    .group-name.accent { fill: var(--accent); }
+    .edge { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    .edge.accent { stroke: var(--accent); stroke-width: 2; }
+    .edge.good { stroke: var(--good); stroke-width: 2; }
+    .edge.bad { stroke: var(--bad); stroke-width: 2; }
+    .edge.dashed { stroke-dasharray: 5 4; }
+    .head { fill: var(--line); } .head.accent { fill: var(--accent); }
+    .head.good { fill: var(--good); } .head.bad { fill: var(--bad); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head accent" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head good" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head bad" d="M0 0L10 5L0 10z"/></marker>
+  </defs>
+  <rect class="bg" width="760" height="276"/>
+  <text class="title" x="24" y="34">Every release passes three stages before it reaches all users</text>
+  <g class="group" id="build">
+    <rect class="group" x="24" y="56" width="216" height="196" rx="8"/>
+    <text class="group-name accent" x="132" y="84" text-anchor="middle">Build</text>
+  </g>
+  <g class="group" id="verify">
+    <rect class="group" x="272" y="56" width="216" height="196" rx="8"/>
+    <text class="group-name accent" x="380" y="84" text-anchor="middle">Verify</text>
+  </g>
+  <g class="group" id="ship">
+    <rect class="group" x="520" y="56" width="216" height="196" rx="8"/>
+    <text class="group-name accent" x="628" y="84" text-anchor="middle">Ship</text>
+  </g>
+  <g class="node" id="build-1">
+    <rect class="box tint" x="40" y="100" width="184" height="40" rx="8"/>
+    <text class="item" x="132" y="124.5">Compile and package</text>
+  </g>
+  <g class="node" id="build-2">
+    <rect class="box tint" x="40" y="148" width="184" height="40" rx="8"/>
+    <text class="item" x="132" y="172.5">Run unit tests</text>
+  </g>
+  <g class="node" id="verify-1">
+    <rect class="box tint" x="288" y="100" width="184" height="40" rx="8"/>
+    <text class="item" x="380" y="124.5">Deploy to staging</text>
+  </g>
+  <g class="node" id="verify-2">
+    <rect class="box tint" x="288" y="148" width="184" height="40" rx="8"/>
+    <text class="item" x="380" y="172.5">Run integration tests</text>
+  </g>
+  <g class="node" id="verify-3">
+    <rect class="box tint" x="288" y="196" width="184" height="40" rx="8"/>
+    <text class="item" x="380" y="220.5">Check the error budget</text>
+  </g>
+  <g class="node" id="ship-1">
+    <rect class="box tint" x="536" y="100" width="184" height="40" rx="8"/>
+    <text class="item" x="628" y="124.5">Roll out to 5%</text>
+  </g>
+  <g class="node" id="ship-2">
+    <rect class="box tint" x="536" y="148" width="184" height="40" rx="8"/>
+    <text class="item" x="628" y="172.5">Roll out to everyone</text>
+  </g>
+  <g class="edges">
+    <path class="edge" id="e-build-verify" data-from="build" data-to="verify" d="M240 154H272" marker-end="url(#arrow)"/>
+    <path class="edge" id="e-verify-ship" data-from="verify" data-to="ship" d="M488 154H520" marker-end="url(#arrow)"/>
+  </g>
+</svg>

@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" role="img" aria-label="Nobody changed the report job: a new grant opened a route to payment data">
+  <style>
+    svg { --bg:#ffffff; --ink:#0e0e0e; --quiet:#484745; --line:#bbbaaf; --tint:#f3f2ee;
+          --accent:#266dcc; --accent-soft:#e5edf9; --good:#169824; --good-soft:#e3f3e5;
+          --bad:#c93537; --bad-soft:#f8e7e7; --warn:#a15c00; --warn-soft:#fbefd9;
+          font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg:#1f1e1d; --ink:#f2f1ec; --quiet:#b8b6ad; --line:#6b6962; --tint:#2a2927;
+            --accent:#6ea6ee; --accent-soft:#1d2a3c; --good:#5cc06a; --good-soft:#1c3020;
+            --bad:#f07373; --bad-soft:#3a2020; --warn:#e5a54b; --warn-soft:#382a14; }
+    }
+    .bg { fill: var(--bg); }
+    .title { font-size: 15px; font-weight: 600; fill: var(--ink); }
+    .box { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    .box.tint { fill: var(--tint); }
+    .box.accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+    .box.good { fill: var(--good-soft); stroke: var(--good); stroke-width: 2; }
+    .box.bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 2; }
+    .box.warn { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 2; }
+    .name { font-size: 15px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
+    .note { font-size: 13px; fill: var(--quiet); text-anchor: middle; }
+    .label { font-size: 11.5px; fill: var(--quiet); }
+    .label.strong { font-weight: 600; fill: var(--ink); }
+    .label.bad { fill: var(--bad); } .label.good { fill: var(--good); } .label.accent { fill: var(--accent); }
+    .label.bad.strong, .label.good.strong, .label.accent.strong { font-weight: 600; }
+    .item { font-size: 13px; fill: var(--ink); text-anchor: middle; }
+    rect.group { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    rect.group.dashed { stroke-dasharray: 6 5; }
+    rect.group.tint { fill: var(--tint); stroke: none; }
+    .group-name { font-size: 14px; font-weight: 600; fill: var(--quiet); }
+    .group-name.accent { fill: var(--accent); }
+    .edge { fill: none; stroke: var(--line); stroke-width: 1.25; }
+    .edge.accent { stroke: var(--accent); stroke-width: 2; }
+    .edge.good { stroke: var(--good); stroke-width: 2; }
+    .edge.bad { stroke: var(--bad); stroke-width: 2; }
+    .edge.dashed { stroke-dasharray: 5 4; }
+    .head { fill: var(--line); } .head.accent { fill: var(--accent); }
+    .head.good { fill: var(--good); } .head.bad { fill: var(--bad); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head accent" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head good" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="arrow-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head bad" d="M0 0L10 5L0 10z"/></marker>
+  </defs>
+  <rect class="bg" width="760" height="360"/>
+  <text class="title" x="24" y="34">Nobody changed the report job: a new grant opened a route to payment data</text>
+  <g class="legend">
+    <rect class="box good" x="24" y="49" width="14" height="14" rx="3"/>
+    <text class="label" x="46" y="60">Approved route</text>
+    <rect class="box bad" x="176" y="49" width="14" height="14" rx="3"/>
+    <text class="label" x="198" y="60">New route after the grant</text>
+  </g>
+  <g class="node" id="job">
+    <rect class="box" x="24" y="98" width="200" height="56" rx="8"/>
+    <text class="name" x="124" y="122">Report job</text>
+    <text class="note" x="124" y="140">nightly batch</text>
+  </g>
+  <g class="node" id="account">
+    <rect class="box" x="280" y="98" width="200" height="56" rx="8"/>
+    <text class="name" x="380" y="122">Service account</text>
+    <text class="note" x="380" y="140">reporting-sa</text>
+  </g>
+  <g class="node" id="analytics">
+    <rect class="box good" x="536" y="98" width="200" height="56" rx="8"/>
+    <text class="name" x="636" y="122">Analytics DB</text>
+    <text class="note" x="636" y="140">the approved data</text>
+  </g>
+  <g class="node" id="admin-role">
+    <rect class="box bad" x="280" y="226" width="200" height="56" rx="8"/>
+    <text class="name" x="380" y="250">Shared admin role</text>
+    <text class="note" x="380" y="268">granted last week</text>
+  </g>
+  <g class="node" id="payments">
+    <rect class="box bad" x="536" y="208" width="200" height="56" rx="8"/>
+    <text class="name" x="636" y="232">Payments DB</text>
+    <text class="note" x="636" y="250">card tokens</text>
+  </g>
+  <g class="node" id="customers">
+    <rect class="box bad" x="536" y="280" width="200" height="56" rx="8"/>
+    <text class="name" x="636" y="304">Customer DB</text>
+    <text class="note" x="636" y="322">contact details</text>
+  </g>
+  <g class="edges">
+    <path class="edge" id="e-job-account" data-from="job" data-to="account" d="M224 126H280" marker-end="url(#arrow)"/>
+    <path class="edge good" id="e-account-analytics" data-from="account" data-to="analytics" d="M480 126H536" marker-end="url(#arrow-good)"/>
+    <path class="edge bad dashed" id="e-account-admin" data-from="account" data-to="admin-role" d="M380 154V226" marker-end="url(#arrow-bad)"/>
+    <path class="edge bad" id="e-admin-payments" data-from="admin-role" data-to="payments" d="M480 254H508V236H536" marker-end="url(#arrow-bad)"/>
+    <path class="edge bad" id="e-admin-customers" data-from="admin-role" data-to="customers" d="M480 254H508V308H536" marker-end="url(#arrow-bad)"/>
+  </g>
+  <text class="label" x="252" y="118" text-anchor="middle">runs as</text>
+  <text class="label" x="508" y="118" text-anchor="middle">reads</text>
+  <text class="label bad strong" x="372" y="186" text-anchor="end">new grant, added</text>
+  <text class="label bad" x="372" y="202" text-anchor="end">by the platform team</text>
+  <text class="label bad strong" x="380" y="306" text-anchor="middle">3 outside the approval</text>
+</svg>

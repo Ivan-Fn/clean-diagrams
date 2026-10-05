@@ -1,0 +1,14 @@
+{
+  "name": "clean-diagrams",
+  "owner": {
+    "name": "Ivan Fofanov"
+  },
+  "description": "One plugin: clean-diagrams, for clean architecture and flow diagrams.",
+  "plugins": [
+    {
+      "name": "clean-diagrams",
+      "source": "./",
+      "description": "Clean architecture and flow diagrams as standalone SVG, with layout checks and PNG, PDF and editable draw.io exports."
+    }
+  ]
+}
