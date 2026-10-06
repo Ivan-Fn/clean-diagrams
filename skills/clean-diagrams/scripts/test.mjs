@@ -196,6 +196,15 @@ for (const t of templates) {
   result(x.code === 0 && listed, `extract reads back every box of ${t}`, x.code ? x.out : '');
 }
 
+/* the summary names a preview only when a preview file was written */
+if (HAVE_BROWSER) {
+  const novb = join(WORK, 'novb.svg');
+  writeFileSync(novb, readFileSync(join(TPL, 'flow.svg'), 'utf8').replace('viewBox="0 0 760 262" ', ''));
+  const r = run('check.mjs', [novb, '--browser-only', '--out', join(WORK, 'novb-out')]);
+  result(r.code === 1 && /FAIL\s+viewbox/.test(r.out) && !/previews: (chromium|chrome|msedge)/.test(r.out) && !existsSync(join(WORK, 'novb-out', 'novb.check-light.png')),
+    'browser pass alone reports a missing viewBox and claims no previews', r.out.trim().split('\n').pop());
+}
+
 /* 5. draw.io output details */
 {
   const p = join(WORK, 'before-after.svg');
@@ -271,6 +280,14 @@ for (const t of templates) {
     const ok = r.code === 0 && /boxes: 2\b/.test(r.out) && /"Web app"/.test(r.out) && /"(Queue|Topic)"/.test(r.out) && /-> \S+\s+"enqueue"\s+dashed/.test(r.out);
     result(ok, `extract reads ${name}: 2 boxes, the dashed labelled arrow`, ok ? '' : r.out.trim().split('\n').slice(0, 6).join(' | '));
   }
+  /* a cell marked container=1 is a container even when it holds nothing yet */
+  const emptyBox = join(WORK, 'empty-container.drawio');
+  writeFileSync(emptyBox, '<mxfile><diagram name="E" id="e"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>'
+    + '<mxCell id="zone" value="Private subnet" style="rounded=1;container=1;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="300" height="200" as="geometry"/></mxCell>'
+    + '<mxCell id="svc" value="Service" style="rounded=1;" vertex="1" parent="1"><mxGeometry x="400" y="0" width="120" height="60" as="geometry"/></mxCell>'
+    + '</root></mxGraphModel></diagram></mxfile>');
+  const ec = run('extract.mjs', [emptyBox]);
+  result(/boxes: 1 · containers: 1/.test(ec.out), 'extract counts an empty container=1 cell as a container', ec.out.split('\n')[2]);
   const pg = run('extract.mjs', [join(WORK, 'x.drawio'), '--page', '2']);
   result(pg.code === 0 && /"Topic"/.test(pg.out) && /pages: 1\. One \| 2\. Two/.test(pg.out), 'extract --page picks the second page');
 }
