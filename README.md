@@ -11,6 +11,8 @@ draw.io and Excalidraw diagrams in this style.
 
 ![Nobody changed the report job: a new grant opened a route to payment data](skills/clean-diagrams/templates/before-after.svg)
 
+![Trade data leaves the data centre only through the gateway](skills/clean-diagrams/templates/boundaries.svg)
+
 ## Install
 
 As a Claude Code plugin:
@@ -42,6 +44,7 @@ Ask in plain words:
 - "Redraw `docs/arch.drawio` in the clean style and give me a PNG for the deck."
 - "Make a before and after diagram of the permission change, for the incident report."
 - "Draw the sign-in sequence between the app, the identity provider and the API."
+- "Show which parts run on premises and which in our AWS and GCP accounts, with icons."
 
 Claude writes the SVG, runs the checker until it reports no failures, looks at the light
 and dark renders, and exports the formats you need.
@@ -70,11 +73,14 @@ the draw.io round trip work.
 |---|---|
 | `skills/clean-diagrams/SKILL.md` | The instructions Claude follows |
 | `skills/clean-diagrams/references/` | Style and markup rules, layouts, importing, publishing |
-| `skills/clean-diagrams/templates/` | Five example diagrams to start from |
+| `skills/clean-diagrams/templates/` | Six example diagrams to start from |
 | `skills/clean-diagrams/scripts/` | Checker, exporter, draw.io converter, importer, tests |
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE). The bundled Liberation Sans font files in
-`skills/clean-diagrams/scripts/fonts/` are under the SIL Open Font License 1.1; see
-`LICENSE-LiberationSans.txt` in that folder.
+MIT. See [LICENSE](LICENSE). Bundled third-party files keep their own licences:
+
+- Liberation Sans fonts in `skills/clean-diagrams/scripts/fonts/`: SIL Open Font License 1.1
+  (`LICENSE-LiberationSans.txt`).
+- Lucide icons in `skills/clean-diagrams/scripts/icons/`: ISC, with some icons under MIT from
+  Feather (`LICENSE-Lucide.txt`).

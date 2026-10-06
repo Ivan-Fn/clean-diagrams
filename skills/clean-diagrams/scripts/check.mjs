@@ -97,7 +97,26 @@ const MEASURE_IN_PAGE = (fallbackFont) => {
     return { id: e.id, from: e.dataset.from || '', to: e.dataset.to || '', head: !!e.getAttribute('marker-end') || (!!me && me !== 'none'), plain: e.classList.contains('plain'),
       len, P0: pt(0), P1: pt(len), samples: steps(len).map(pt) };
   });
-  return { W: vb.width, H: vb.height, shapes, texts, edges };
+  const icons = [...svg.querySelectorAll('use.icon')].filter((u) => !u.closest('defs, symbol') && visible(u)).map((u) => {
+    const href = (u.getAttribute('href') || u.getAttribute('xlink:href') || '').replace(/^#/, '');
+    const x = u.x.baseVal.value, y = u.y.baseVal.value, w = u.width.baseVal.value, h = u.height.baseVal.value;
+    const r = { x, y, w, h, r: x + w, b: y + h };
+    const c = { x: x + w / 2, y: y + h / 2 };
+    let bg = { r: 255, g: 255, b: 255, a: 1 };
+    for (const el of painted) {
+      const ps = getComputedStyle(el), fill = rgba(ps.fill);
+      if (!fill || fill.a === 0) continue;
+      const bb = box(el.getBBox());
+      if (!(c.x > bb.x && c.x < bb.r && c.y > bb.y && c.y < bb.b)) continue;
+      if (el.tagName !== 'rect' && !(el.isPointInFill && el.isPointInFill(Object.assign(svg.createSVGPoint(), c)))) continue;
+      bg = blend({ ...fill, a: fill.a * parseFloat(ps.fillOpacity) * op(el) }, bg);
+    }
+    const fg = rgba(getComputedStyle(u).color);
+    const own = u.closest('g.node, g.group');
+    return { href, ok: !!(href && svg.querySelector(`symbol[id="${href}"]`)), sized: w > 0 && h > 0, label: href.replace(/^icon-/, ''),
+      where: own && own.id ? `#${own.id}` : `icon ${href}`, owner: own && own.id ? own.id : null, r, fg: fg ? { ...fg, a: fg.a * op(u) } : null, bg };
+  });
+  return { W: vb.width, H: vb.height, shapes, texts, edges, icons };
 };
 
 const all = [];

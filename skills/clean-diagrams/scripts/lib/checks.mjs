@@ -55,7 +55,9 @@ export function geometryProblems(m) {
     } else {
       for (const n of m.shapes) {
         if (n.kind === 'lifeline') { if (overlap(t.r, { ...n.r, x: n.r.x - 2, r: n.r.r + 2 })) add('fail', 'text-on-border', t.where, `"${t.label}" crosses lifeline #${n.id}; place it between two lifelines`); continue; }
-        if (overlap(t.r, n.r) && !contains(n.r, t.r)) add('fail', 'text-on-border', t.where, `"${t.label}" crosses the border of #${n.id}`);
+        if (overlap(t.r, n.r) && !contains(n.r, t.r)) {
+          add('fail', 'text-on-border', t.where, `"${t.label}" (${Math.ceil(t.r.w)} wide) crosses the border of #${n.id}; move it clear by 4 or more, shorten it, or widen the gap it sits in`);
+        }
         else if (n.kind === 'node' && contains(n.r, t.r)) add('fail', 'loose-text-in-box', t.where, `"${t.label}" sits inside #${n.id} but is not in its <g class="node">`);
         else if (n.kind === 'node' && overlap({ x: t.r.x - 4, y: t.r.y - 4, r: t.r.r + 4, b: t.r.b + 4 }, n.r)) add('fail', 'label-crowding', t.where, `"${t.label}" is less than 4 from #${n.id}; move it into a wider gap or above the row`);
       }
@@ -69,6 +71,22 @@ export function geometryProblems(m) {
   }
   for (const grp of m.shapes.filter((s) => s.kind === 'group')) for (const n of nodes) {
     if (overlap(grp.r, n.r) && !contains(grp.r, n.r)) add('fail', 'straddles-group', `#${n.id}`, `#${n.id} crosses the border of #${grp.id}`);
+  }
+  for (const i of m.icons || []) {
+    if (!i.ok) add('fail', 'icon-missing', i.where, `icon "${i.label}" has no <symbol id="${i.href}"> in the file; run: node scripts/icons.mjs <file>`);
+    if (!i.sized) { add('fail', 'icon-size', i.where, `icon "${i.label}" needs width and height (18 in a box, 16 beside a container name)`); continue; }
+    if (i.r.w !== i.r.h || ![16, 18].includes(Math.round(i.r.w))) add('warn', 'icon-size', i.where, `icon "${i.label}" is ${Math.round(i.r.w)}x${Math.round(i.r.h)}; icons are 18x18 in a box and 16x16 beside a container name`);
+    if (i.r.x < 0 || i.r.y < 0 || i.r.r > W || i.r.b > H) add('fail', 'out-of-frame', i.where, `icon "${i.label}" is outside the ${W}x${H} viewBox`);
+    const s = i.owner && byId.get(i.owner);
+    if (s && s.kind === 'node' && !contains(s.r, i.r, 4, 4)) add('fail', 'icon-outside-box', i.where, `icon "${i.label}" must sit at least 4 inside its box; place it at x = box x + 14, vertically centred`);
+    for (const n of m.shapes) {
+      if (n.kind !== 'node' || n.id === i.owner) continue;
+      if (overlap(i.r, n.r)) add('fail', 'icon-on-border', i.where, `icon "${i.label}" overlaps #${n.id}`);
+    }
+    for (const t of m.texts) if (overlap(i.r, { x: t.r.x - 2, y: t.r.y, r: t.r.r + 2, b: t.r.b })) add('fail', 'icon-over-text', i.where, `icon "${i.label}" overlaps "${t.label}"; keep 4 between an icon and text`);
+  }
+  for (let a = 0; a < (m.icons || []).length; a++) for (let b = a + 1; b < m.icons.length; b++) {
+    if (overlap(m.icons[a].r, m.icons[b].r)) add('fail', 'icon-overlap', m.icons[a].where, `icons "${m.icons[a].label}" and "${m.icons[b].label}" overlap`);
   }
   const seenPaths = new Map();
   for (const e of m.edges) {
@@ -94,6 +112,7 @@ export function geometryProblems(m) {
     if (!okEnd(e.P1, to)) add('fail', 'edge-end', id, `ends at ${Math.round(e.P1.x)},${Math.round(e.P1.y)}, ${away(e.P1, to)}${hint(e.P1, to)}`);
     const hitsBox = new Set(), hitsText = new Set();
     for (const p of e.samples) {
+      for (const ic of m.icons || []) if (!ic.owner && inside(p, ic.r)) hitsText.add(`icon ${ic.label}`);
       for (const n of nodes) if (inside(p, n.r, 2)) hitsBox.add(n.id);
       for (const t of m.texts) if (inside(p, { x: t.r.x - 1, y: t.r.y - 1, r: t.r.r + 1, b: t.r.b + 1 })) hitsText.add(t.label);
     }
@@ -105,6 +124,12 @@ export function geometryProblems(m) {
 
 export function colourProblems(m, theme) {
   const problems = [];
+  /* an icon is a graphic: WCAG asks 3:1 against what is behind it */
+  for (const i of m.icons || []) {
+    if (!i.fg) { problems.push({ level: 'fail', check: 'icon-contrast', where: i.where, msg: `icon "${i.label}" has no colour; give the <use> class="icon"` }); continue; }
+    const got = contrastRatio(blend(i.fg, i.bg), i.bg);
+    if (got < 3) problems.push({ level: 'fail', check: 'icon-contrast', where: i.where, msg: `icon "${i.label}" contrast ${got.toFixed(2)}:1 in the ${theme} theme; needs 3:1` });
+  }
   for (const t of m.texts) {
     if (!t.fg) { problems.push({ level: 'fail', check: 'text-fill', where: t.where, msg: `"${t.label}" has no fill colour` }); continue; }
     const need = t.size >= 24 || (t.weight >= 600 && t.size >= 18.66) ? 3 : 4.5;

@@ -36,5 +36,6 @@ export function parseArgs(argv, { flags = [], values = [], usage, minPositional 
 /* The input must be an existing file (not a folder). Exits 2 with a message otherwise. */
 export function requireFile(path, usage) {
   if (!path || !existsSync(path)) { console.error(`no such file: ${path}\nusage: ${usage}`); process.exit(2); }
-  if (!statSync(path).isFile()) { console.error(`${path} is a folder, not a file\nusage: ${usage}`); process.exit(2); }
+  const st = statSync(path);
+  if (!st.isFile()) { console.error(`${path} is ${st.isDirectory() ? 'a folder' : 'not a regular file'}\nusage: ${usage}`); process.exit(2); }
 }

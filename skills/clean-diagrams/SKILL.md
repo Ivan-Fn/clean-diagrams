@@ -37,14 +37,16 @@ install. Optional extras, used automatically when present:
 2. **Pick a layout** from [references/layouts.md](references/layouts.md) and copy the
    closest file from `templates/`. Keep its `<style>` and `<defs>` blocks as they are.
 3. **Write the SVG** following [references/style.md](references/style.md): the markup the
-   scripts read, the box-sizing arithmetic, and the colour rules. Use whole numbers.
+   scripts read, the box-sizing arithmetic, the colour rules, and where icons go. Use whole
+   numbers. If the diagram has icons, run `node scripts/icons.mjs diagram.svg` after
+   writing or changing them.
    Exact alignment matters most: boxes in a row share their top edge and height, and gaps
    in a row are equal.
 4. **Check it, then look at it.**
    ```bash
    node scripts/check.mjs diagram.svg --out /tmp/diagram-check
    ```
-   Fix every `FAIL` line; each one names the element and the fix. Then open
+   Fix every `FAIL` line; each one names the element, and most say how to fix it. Then open
    `diagram.check-light.png` and `diagram.check-dark.png` from the output folder and ask
    whether the title's claim is visible at a glance. Repeat until both are true. The last
    line says what checked the file and made the previews; without a browser or a renderer
@@ -93,7 +95,9 @@ user marks as important. Tell the user anything you merged, renamed or dropped.
   (the arithmetic is in style.md).
 - Arrows run in the gaps between boxes, start and end on a box edge, and bend at right
   angles around anything in the way. Labels sit beside the line, never on it.
-- No shadows, gradients, icons or `<foreignObject>`. Colours come only from the CSS
+- Icons are optional: a type icon on the left of each box and a place icon beside each
+  container's name, from the bundled set, in grey or the box's own colour. No logos.
+- No shadows, gradients, images or `<foreignObject>`. Colours come only from the CSS
   variables in the template, so the dark theme works.
 - The canvas is 760 wide, the width of a documentation column. Grow down, not wide. Split
   a diagram that needs more than about 12 boxes.
@@ -107,6 +111,8 @@ user marks as important. Tell the user anything you merged, renamed or dropped.
 | `templates/groups.svg` | Stages or zones as containers holding smaller items |
 | `templates/before-after.svg` | An approved path in green and a new path in red, with a legend |
 | `templates/sequence.svg` | Messages between parties in time order, on lifelines |
+| `templates/boundaries.svg` | Where each part runs: on-premises and cloud containers, with icons |
+| `scripts/icons.mjs` | Writes the icons a diagram uses into it; `--search` finds an icon |
 | `scripts/check.mjs` | Layout, text-fit, arrow and contrast checks in light and dark, with Node alone; a browser adds a render pass |
 | `scripts/export.mjs` | PNG, PDF, fixed-theme and flattened SVG exports |
 | `scripts/to-drawio.mjs` | SVG to an editable `.drawio` file, optionally exported by draw.io |

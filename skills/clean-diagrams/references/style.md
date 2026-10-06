@@ -3,7 +3,7 @@
 This file holds the rules for writing a clean-diagrams SVG: the markup the scripts read,
 the classes the template defines, and the arithmetic for sizing boxes and placing text.
 
-Contents: markup · classes · colour · box sizing · text placement · arrows · spacing
+Contents: markup · classes · colour · box sizing · text placement · icons · arrows · spacing
 
 ## Markup the scripts read
 
@@ -65,6 +65,8 @@ the palette table under Colour.
 | single-line item | `item` | 13, ink, centred |
 | container | `group` on the `<rect>`, optional `dashed` or `tint` | grey border 1.25; `tint` is a grey fill with no border |
 | lifeline | `lifeline` on the `<path>` | grey dashed line 1.25 |
+| icon | `icon` on the `<use>`, optional `ink`, `accent`, `good`, `bad`, `warn` | grey outline drawing |
+| text beside an icon | `start` added to `name`, `note` or `group-name` | left-aligned |
 | container name | `group-name`, optional `accent` | 14 semibold, quiet or blue |
 | arrow | `edge`, optional `accent` / `good` / `bad`, optional `dashed` | grey 1.25, or coloured 2 |
 | arrowhead | `marker-end="url(#arrow)"`, `#arrow-accent`, `#arrow-good`, `#arrow-bad` | match the arrow's colour |
@@ -135,6 +137,87 @@ A taller box than its text needs: move the whole block down by half the extra he
 Container names sit 28 below the container's top edge, centred or 16 in from the left.
 The first box inside starts 44 below the container's top edge, 16 in from its sides, and
 the last ends at least 16 above its bottom edge.
+
+## Icons
+
+Icons are optional. Use them when the kind of thing helps the reader: where it runs (on
+premises, a cloud account) and what it is (a database, a function, a queue). Leave them out
+when every box would get the same icon, or when the diagram is about order, not kinds.
+
+- **Where it runs** goes on containers: a 16-unit icon in the container's top-left corner
+  (x + 16, y + 14) and the container name beside it, left-aligned
+  (`class="group-name start"`, x + 40, y + 28). Name the provider in words ("AWS account",
+  "GCP project", "On-premises"); vendor logos are trademarks and break the one-accent look.
+- **What it is** goes on boxes: an 18-unit icon 14 in from the box's left edge,
+  vertically centred (y = box centre − 9), with the text left-aligned 42 in
+  (`class="name start"`, `class="note start"`). Baselines are the same as for centred
+  text (name y + 24, note y + 42). Box width = longest line × its units + 58 (42 on the
+  left for the icon, 16 on the right).
+- One icon per box. Give every box in a diagram an icon, or none; a few boxes with icons
+  and the rest without looks unfinished.
+- Colour: grey by default (`class="icon"`). On an accent or status box use the same class
+  as the box (`class="icon accent"`, `good`, `bad`, `warn`).
+
+Markup, then run `node scripts/icons.mjs diagram.svg`, which writes the drawing of every
+icon used into `<defs>` and removes unused ones:
+
+```xml
+<g class="node" id="orders-db">
+  <rect class="box" x="40" y="104" width="184" height="56" rx="8"/>
+  <use class="icon" href="#icon-database" x="54" y="123" width="18" height="18"/>
+  <text class="name start" x="82" y="128">Orders DB</text>
+  <text class="note start" x="82" y="146">PostgreSQL</text>
+</g>
+```
+
+Find an icon with `node scripts/icons.mjs --search <word>` (1,866 Lucide icons); it
+checks the table below first, so architecture words such as "kubernetes", "gateway" or
+"data centre" find the icon listed here. The usual ones:
+
+| Thing | Icon |
+|---|---|
+| on premises, data centre, office | `building` |
+| cloud account, project, subscription | `cloud` |
+| Kubernetes cluster | `ship-wheel` |
+| region, zone | `map-pin` |
+| internet, external service | `globe` |
+| network, VPC | `network` |
+| server, virtual machine | `server` |
+| container, pod | `container` |
+| function, serverless | `square-function` |
+| service, microservice | `box` |
+| API | `braces` |
+| web app | `app-window` |
+| mobile app | `smartphone` |
+| user, person | `user` |
+| team, group | `users` |
+| database | `database` |
+| cache | `database-zap` |
+| data warehouse | `warehouse` |
+| object storage, files | `archive` |
+| disk, volume | `hard-drive` |
+| queue | `inbox` |
+| event stream, pub/sub | `radio-tower` |
+| gateway, firewall, policy | `shield` |
+| load balancer | `split` |
+| identity provider, keys | `key-round` |
+| secrets, vault | `lock-keyhole` |
+| scheduler, cron | `clock` |
+| worker, batch job | `cog` |
+| AI agent | `bot` |
+| model | `brain` |
+| pipeline, CI/CD | `workflow` |
+| repository | `git-branch` |
+| dashboard | `layout-dashboard` |
+| metrics | `activity` |
+| logs | `scroll-text` |
+| alerts | `bell` |
+| email | `mail` |
+| chat | `message-square` |
+| document | `file-text` |
+| payments | `credit-card` |
+| bank, core banking | `landmark` |
+| plug-in, integration | `plug` |
 
 ## Arrows
 

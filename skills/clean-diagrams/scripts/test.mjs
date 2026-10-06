@@ -75,13 +75,18 @@ const cases = [
   ['text-fill', 'flow.svg', '.label { font-size: 11.5px; fill: var(--quiet); }', '.label { font-size: 11.5px; fill: none; }'],
   ['edge-end', 'sequence.svg', 'd="M100 140H287"', 'd="M100 140H280"'],
   ['edge-path', 'flow.svg', 'd="M164 94H214"', 'd="M164 94H1e8"'],
+  ['icon-missing', 'boundaries.svg', '<symbol id="icon-shield"', '<symbol id="icon-shield-gone"'],
+  ['icon-outside-box', 'boundaries.svg', 'href="#icon-shield" x="54"', 'href="#icon-shield" x="34"'],
+  ['icon-over-text', 'boundaries.svg', 'href="#icon-inbox" x="302"', 'href="#icon-inbox" x="322"'],
+  ['icon-contrast', 'boundaries.svg', 'use.icon { color: var(--quiet); }', 'use.icon { color: #eeeeee; }'],
+  ['icon-on-border', 'boundaries.svg', 'href="#icon-cloud" x="288" y="70"', 'href="#icon-cloud" x="296" y="96"'],
 ];
 /* is a browser available? then every case also runs with the browser pass alone */
 const probe = run('check.mjs', [join(TPL, 'flow.svg')]);
 const HAVE_BROWSER = / \+ (chromium|chrome|msedge|Chrome at)/.test(probe.out);
 const BROWSER_SEES = new Set(['text-outside-box', 'text-overlap', 'label-crowding', 'text-on-border', 'edge-end', 'edge-start', 'edge-through-box',
   'edge-ref', 'edge-over-text', 'contrast', 'font-size', 'text-outline', 'out-of-frame', 'text-out-of-frame', 'boxes-too-close', 'straddles-group',
-  'xml', 'text-under-box', 'loose-text-in-box', 'edge-ends', 'text-fill']);
+  'xml', 'text-under-box', 'loose-text-in-box', 'edge-ends', 'text-fill', 'icon-missing', 'icon-outside-box', 'icon-over-text', 'icon-contrast', 'icon-on-border']);
 for (const [check, tpl, find, replace] of cases) {
   let p;
   try { p = broken(tpl, find, replace); } catch (e) { result(false, `check ${check}`, e.message); continue; }
@@ -202,6 +207,32 @@ for (const t of templates) {
   result(/value="Report job&#10;nightly batch"/.test(readFileSync(join(WORK, 'plain.drawio'), 'utf8')), '--plain-labels keeps line breaks');
   const seq = readFileSync(join(WORK, 'sequence.drawio'), 'utf8');
   result(!seq.includes('NaN') && (seq.match(/edge="1"/g) || []).length === 11, 'sequence diagram converts with 4 lifelines and 7 messages, no NaN');
+}
+
+/* 5b. icons: the script, the flattened file, draw.io */
+{
+  const tplB = readFileSync(join(TPL, 'boundaries.svg'), 'utf8');
+  const f = join(WORK, 'icons.svg');
+  /* strip the symbols, let icons.mjs put them back: the result must equal the template */
+  writeFileSync(f, tplB.replace(/\n?[ \t]*<symbol id="icon-[\s\S]*?<\/symbol>/g, ''));
+  const r1 = run('icons.mjs', [f]);
+  result(r1.code === 0 && readFileSync(f, 'utf8') === tplB, 'icons.mjs restores every symbol the diagram uses', r1.out.trim());
+  const r2 = run('icons.mjs', [f]);
+  result(readFileSync(f, 'utf8') === tplB && /8 icons in use$/.test(r2.out.trim()), 'icons.mjs run twice changes nothing');
+  writeFileSync(f, tplB.replace('<use class="icon" href="#icon-building" x="40" y="70" width="16" height="16"/>', ''));
+  run('icons.mjs', [f]);
+  result(!readFileSync(f, 'utf8').includes('id="icon-building"'), 'icons.mjs removes a symbol no icon uses');
+  writeFileSync(f, tplB.replace('#icon-shield"', '#icon-sheild"'));
+  const r3 = run('icons.mjs', [f]);
+  result(r3.code === 1 && /unknown icon "sheild"; similar: .*shield/.test(r3.out), 'icons.mjs rejects an unknown icon and suggests a name', r3.out.trim().split('\n')[0]);
+  const s = run('icons.mjs', ['--search', 'database']);
+  result(s.code === 0 && /^database\s/m.test(s.out), 'icons.mjs --search finds an icon by name');
+  const fb = join(WORK, 'boundaries.svg');
+  run('export.mjs', [fb, '--flat', '--out', join(WORK, 'flatb')]);
+  const flat = readFileSync(join(WORK, 'flatb', 'boundaries.flat.svg'), 'utf8');
+  result((flat.match(/<symbol /g) || []).length === 8 && /<use[^>]*class="icon accent"[^>]*color="#266dcc"/.test(flat), 'flattened SVG keeps the icons and gives each its colour');
+  const xml = readFileSync(join(WORK, 'boundaries.drawio'), 'utf8');
+  result((xml.match(/shape=image/g) || []).length === 9 && /id="gateway"[^>]*align=left;spacingLeft=/.test(xml), 'to-drawio places all 9 icons and keeps text beside them left-aligned');
 }
 
 /* 6. extract.mjs on every input format */

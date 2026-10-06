@@ -75,7 +75,17 @@ const read = (theme) => {
   const free = all.filter((t) => t.tag === 'text' && textOf(t).trim() && !closest(t, isShape)).map(txt);
   const loose = all.filter((r) => r.tag === 'rect' && !closest(r, isShape) && !hasClass(r, 'bg')).map((r) => ({ rect: bb(rectBox(r)), rx: num(r.attrs.rx), paint: paint(r) }));
   const title = all.find((e) => e.tag === 'text' && hasClass(e, 'title'));
-  return { W: vb.w, H: vb.h, shapes, edges, free, loose, lifelines, title: title ? textOf(title).trim() : '' };
+  /* icons: the symbol's drawing plus the colour the <use> resolves to in this theme */
+  const symbolOf = new Map(elements(doc.svg).filter((e) => e.tag === 'symbol' && e.attrs.id).map((e) => [e.attrs.id, e]));
+  const ser = (el) => `<${el.tag}${Object.entries(el.attrs).map(([k, v]) => ` ${k}="${String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`).join('')}${el.children.filter((c) => c.tag[0] !== '#').length ? `>${el.children.filter((c) => c.tag[0] !== '#').map(ser).join('')}</${el.tag}>` : '/>'}`;
+  const icons = all.filter((e) => e.tag === 'use' && hasClass(e, 'icon')).map((u) => {
+    const href = (u.attrs.href || u.attrs['xlink:href'] || '').replace(/^#/, '');
+    const sym = symbolOf.get(href);
+    const owner = closest(u, isShape);
+    return sym ? { href, body: sym.children.filter((c) => c.tag[0] !== '#').map(ser).join(''), viewBox: sym.attrs.viewBox || '0 0 24 24',
+      color: toHex(u.cs.color), owner: owner?.attrs.id ?? null, box: { x: num(u.attrs.x), y: num(u.attrs.y), w: num(u.attrs.width), h: num(u.attrs.height) } } : null;
+  }).filter(Boolean);
+  return { W: vb.w, H: vb.h, shapes, edges, free, loose, lifelines, icons, title: title ? textOf(title).trim() : '' };
 };
 let model;
 try { model = { light: read('light'), dark: read('dark') }; } catch (e) { console.error(`to-drawio: ${e.message}`); process.exit(1); }
@@ -122,9 +132,15 @@ for (const s of ordered) {
     if (s.kind === 'group') {
       st.verticalAlign = 'top';
       st.align = first.anchor === 'middle' ? 'center' : first.anchor === 'end' ? 'right' : 'left';
-      st.spacingTop = n(first.box.y - s.rect.y - 2);
+      st.spacingTop = n(first.box.y - s.rect.y - 4);
       if (st.align === 'left') st.spacingLeft = n(first.box.x - s.rect.x - 2);
       value = PLAIN ? tl.map((t) => t.s).join('\n') : [html(first.s), ...tl.slice(1).map((t) => `<span style="font-weight:normal;opacity:0.75">${html(t.s)}</span>`)].join('<br>');
+    } else {
+      /* text written left-aligned (beside an icon) stays left-aligned at the same inset */
+      if (first.anchor === 'start') { st.align = 'left'; st.spacingLeft = n(first.x - s.rect.x - 2); }
+    }
+    if (s.kind === 'group') {
+      /* handled above */
     } else if (PLAIN) {
       value = tl.map((t) => t.s).join('\n');
     } else {
@@ -189,6 +205,31 @@ for (let changed = true; changed;) {
 
 /* edges */
 const rectOf = (id) => L.shapes.find((s) => s.id === id)?.rect;
+/* Icons become image cells inside their box, so they move with it. draw.io cannot switch an
+   image's colour with its dark mode, so each icon keeps its light-theme colour when that
+   already has 3:1 contrast on a dark page, and otherwise moves toward its dark-theme colour
+   just far enough. Grey icons come out #6c6b66, the darkest grey that does. */
+const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const lumi = (h) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; const [r, g, b] = rgb(h); return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+const ratio = (a, b) => { const [x, y] = [lumi(a), lumi(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const mix = (a, b) => {
+  if (a === 'none' || b === 'none') return a === 'none' ? b : a;
+  const [x, y] = [rgb(a), rgb(b)];
+  for (let t = 0; t <= 1.0001; t += 0.05) {
+    const c = `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+    if (ratio(c, '#121212') >= 3 && ratio(c, '#ffffff') >= 3) return c;
+  }
+  return b;
+};
+L.icons.forEach((ic, k) => {
+  const dc = D.icons[k] ? D.icons[k].color : ic.color;
+  const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${ic.viewBox}" fill="none" stroke="${mix(ic.color, dc)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic.body}</svg>`;
+  const host = ic.owner && L.shapes.find((s) => s.id === ic.owner);
+  const hx = host ? host.rect.x : 0, hy = host ? host.rect.y : 0;
+  const st = `shape=image;html=1;imageAspect=0;aspect=fixed;image=data:image/svg+xml,${Buffer.from(svgIcon).toString('base64')};`;
+  cells.push(`<mxCell id="${uid(ic.href)}" value="" style="${esc(st)}" vertex="1" parent="${host ? esc(host.id) : '1'}"><mxGeometry x="${n(ic.box.x - hx)}" y="${n(ic.box.y - hy)}" width="${n(ic.box.w)}" height="${n(ic.box.h)}" as="geometry"/></mxCell>`);
+});
+
 /* A lifeline is drawn in draw.io as a dashed line that starts on the bottom of the box above
    it (so it moves with that box) and ends at a free point. Messages between lifelines are
    free arrows at their exact positions: draw.io would re-route arrows attached to a line. */

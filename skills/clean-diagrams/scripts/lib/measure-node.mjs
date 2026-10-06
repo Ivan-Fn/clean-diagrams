@@ -42,7 +42,7 @@ export function measure(src, theme) {
     seen.add(id);
   }
   for (const el of all) if (el.attrs.transform) add('warn', 'transform', where(el), 'transform found; the checks measure untransformed geometry, so results may be wrong');
-  for (const el of all) if (['foreignObject', 'image', 'use', 'textPath', 'switch'].includes(el.tag)) add('warn', 'unsupported-element', where(el), `<${el.tag}> is outside the clean-diagrams markup; it is not checked`);
+  for (const el of all) if (['foreignObject', 'image', 'use', 'textPath', 'switch'].includes(el.tag) && !(el.tag === 'use' && hasClass(el, 'icon'))) add('warn', 'unsupported-element', where(el), `<${el.tag}> is outside the clean-diagrams markup; it is not checked`);
 
   const shapes = [];
   for (const g of all.filter(isShapeGroup)) {
@@ -99,6 +99,22 @@ export function measure(src, theme) {
     });
   }
 
+  /* icons: <use class="icon" href="#icon-…" x y width height> */
+  const symbols = new Set(elements(doc.svg).filter((e) => e.tag === 'symbol' && e.attrs.id).map((e) => e.attrs.id));
+  const icons = [];
+  for (const u of all.filter((e) => e.tag === 'use' && hasClass(e, 'icon') && !e.hidden)) {
+    const href = (u.attrs.href || u.attrs['xlink:href'] || '').replace(/^#/, '');
+    const x = num(u.attrs.x), y = num(u.attrs.y), w = num(u.attrs.width), h = num(u.attrs.height);
+    const r = { x, y, w, h, r: x + w, b: y + h };
+    const owner = closest(u, isShapeGroup);
+    const fgRaw = color(u.cs.color);
+    const c = { x: x + w / 2, y: y + h / 2 };
+    let bg = { r: 255, g: 255, b: 255, a: 1 };
+    for (const p of painted) if (within(c, p.box)) bg = blend(p.fill, bg);
+    icons.push({ href, ok: symbols.has(href), sized: w > 0 && h > 0, label: href.replace(/^icon-/, ''), where: owner?.attrs.id ? `#${owner.attrs.id}` : `icon ${href}`,
+      owner: owner?.attrs.id ?? null, r, fg: fgRaw ? { ...fgRaw, a: fgRaw.a * u.op } : null, bg });
+  }
+
   const edges = [];
   for (const e of all.filter((x) => x.tag === 'path' && hasClass(x, 'edge') && !x.hidden)) {
     let pts;
@@ -112,5 +128,5 @@ export function measure(src, theme) {
       P0: pts[0], P1: pts[pts.length - 1], samples: sampleSteps(len).map((d) => pointAt(pts, d)),
     });
   }
-  return { W: vb.w, H: vb.h, problems, shapes, texts, edges };
+  return { W: vb.w, H: vb.h, problems, shapes, texts, edges, icons };
 }

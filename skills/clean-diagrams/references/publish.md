@@ -99,7 +99,10 @@ node scripts/to-drawio.mjs diagram.svg --export        # + diagram.drawio.svg, d
 The `.drawio` file opens in draw.io, diagrams.net, the draw.io desktop app, the VS Code
 draw.io extension and draw.io for Confluence. Boxes stay connected to their arrows, arrow
 labels move with their arrows, and every colour is a light and dark pair, so draw.io's
-dark mode shows the dark palette. The font becomes draw.io's Helvetica.
+dark mode shows the dark palette. The font becomes draw.io's Helvetica. Icons become
+image cells inside their box. draw.io cannot recolour an image for its dark mode, so each
+icon keeps one colour that shows on both backgrounds: grey icons are a mid grey
+(`#6c6b66`), a little lighter than in the SVG.
 
 `--export` runs the draw.io desktop app (free; `brew install --cask drawio` on a Mac). It
 writes `diagram.drawio.svg`, an image that GitHub shows and that draw.io and the VS Code
