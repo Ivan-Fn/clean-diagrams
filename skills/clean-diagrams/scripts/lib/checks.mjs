@@ -54,6 +54,7 @@ export function geometryProblems(m) {
       }
     } else {
       for (const n of m.shapes) {
+        if (n.kind === 'lifeline') { if (overlap(t.r, { ...n.r, x: n.r.x - 2, r: n.r.r + 2 })) add('fail', 'text-on-border', t.where, `"${t.label}" crosses lifeline #${n.id}; place it between two lifelines`); continue; }
         if (overlap(t.r, n.r) && !contains(n.r, t.r)) add('fail', 'text-on-border', t.where, `"${t.label}" crosses the border of #${n.id}`);
         else if (n.kind === 'node' && contains(n.r, t.r)) add('fail', 'loose-text-in-box', t.where, `"${t.label}" sits inside #${n.id} but is not in its <g class="node">`);
         else if (n.kind === 'node' && overlap({ x: t.r.x - 4, y: t.r.y - 4, r: t.r.r + 4, b: t.r.b + 4 }, n.r)) add('fail', 'label-crowding', t.where, `"${t.label}" is less than 4 from #${n.id}; move it into a wider gap or above the row`);
@@ -84,16 +85,20 @@ export function geometryProblems(m) {
     if (!from || !to) continue;
     if (!e.head && !e.plain) add('warn', 'no-arrowhead', id, 'no marker-end; add class "plain" if a bare line is intended');
     const tol = 3;
-    const okEnd = (p, s) => (s.kind === 'group' ? (inside(p, s.r) || distToBorder(p, s.r) <= tol) : distToBorder(p, s.r) <= tol);
-    if (!okEnd(e.P0, from)) add('fail', 'edge-start', id, `starts at ${Math.round(e.P0.x)},${Math.round(e.P0.y)}, ${Math.round(distToBorder(e.P0, from.r))} away from the edge of #${from.id}`);
-    if (!okEnd(e.P1, to)) add('fail', 'edge-end', id, `ends at ${Math.round(e.P1.x)},${Math.round(e.P1.y)}, ${Math.round(distToBorder(e.P1, to.r))} away from the edge of #${to.id}`);
+    const onLine = (p, r) => Math.abs(p.x - r.x) <= tol && p.y >= r.y - tol && p.y <= r.b + tol;
+    const okEnd = (p, s) => (s.kind === 'lifeline' ? onLine(p, s.r) : s.kind === 'group' ? (inside(p, s.r) || distToBorder(p, s.r) <= tol) : distToBorder(p, s.r) <= tol);
+    const away = (p, s) => (s.kind === 'lifeline' ? `${Math.round(Math.abs(p.x - s.r.x))} away from lifeline #${s.id}` : `${Math.round(distToBorder(p, s.r))} away from the edge of #${s.id}`);
+    const hint = (p, s) => (s.kind === 'lifeline' ? `; set its x to ${s.r.x}` : p.x > s.r.x && p.x < s.r.r ? `; move its y to ${Math.round(Math.abs(p.y - s.r.y) < Math.abs(p.y - s.r.b) ? s.r.y : s.r.b)}`
+      : p.y > s.r.y && p.y < s.r.b ? `; move its x to ${Math.round(Math.abs(p.x - s.r.x) < Math.abs(p.x - s.r.r) ? s.r.x : s.r.r)}` : '; end it on the middle of the side it faces');
+    if (!okEnd(e.P0, from)) add('fail', 'edge-start', id, `starts at ${Math.round(e.P0.x)},${Math.round(e.P0.y)}, ${away(e.P0, from)}${hint(e.P0, from)}`);
+    if (!okEnd(e.P1, to)) add('fail', 'edge-end', id, `ends at ${Math.round(e.P1.x)},${Math.round(e.P1.y)}, ${away(e.P1, to)}${hint(e.P1, to)}`);
     const hitsBox = new Set(), hitsText = new Set();
     for (const p of e.samples) {
       for (const n of nodes) if (inside(p, n.r, 2)) hitsBox.add(n.id);
       for (const t of m.texts) if (inside(p, { x: t.r.x - 1, y: t.r.y - 1, r: t.r.r + 1, b: t.r.b + 1 })) hitsText.add(t.label);
     }
     for (const n of hitsBox) add('fail', 'edge-through-box', id, `runs through #${n}; route it around with an elbow`);
-    for (const t of hitsText) add('fail', 'edge-over-text', id, `runs over "${t}"`);
+    for (const t of hitsText) add('fail', 'edge-over-text', id, `runs over "${t}"; move the label beside the line, or route the arrow around it`);
   }
   return problems;
 }
@@ -109,7 +114,6 @@ export function colourProblems(m, theme) {
   return problems;
 }
 
-/* d = 4, 6, 8 … len-4: the same sampling the browser uses via getPointAtLength */
 /* d = 4, 6, 8 … up to 1 before the end, so an arrowhead lying over a label is caught; the
    same sampling the browser pass uses via getPointAtLength */
-export const sampleSteps = (len) => { const out = []; for (let d = 4; d < len - 1; d += 2) out.push(d); return out; };
+export const sampleSteps = (len) => { const step = Math.max(2, len / 4000); const out = []; for (let d = 4; d < len - 1; d += step) out.push(d); return out; };

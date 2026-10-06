@@ -28,6 +28,7 @@ export function measure(src, theme) {
   const all = elements(doc.svg).filter((e) => !inDefs(e));
   const label = (el) => textOf(el).trim().replace(/\s+/g, ' ').slice(0, 40);
   const isShapeGroup = (e) => e.tag === 'g' && (hasClass(e, 'node') || hasClass(e, 'group'));
+  const isLifeline = (e) => e.tag === 'g' && hasClass(e, 'lifeline');
   const where = (el) => {
     const g = closest(el, isShapeGroup);
     return g && g.attrs.id ? `#${g.attrs.id}` : el.attrs.id ? `#${el.attrs.id}` : `"${label(el)}"`;
@@ -51,6 +52,17 @@ export function measure(src, theme) {
     if (!g.attrs.id) { add('fail', 'missing-id', `"${label(g)}"`, `${kind} has no id`); continue; }
     if (!rect) { add('fail', 'no-rect', `#${g.attrs.id}`, 'needs one <rect> as its direct child'); continue; }
     shapes.push({ id: g.attrs.id, kind, r: rectBox(rect) });
+  }
+
+  for (const g of all.filter(isLifeline)) {
+    if (g.hidden) continue;
+    const line = g.children.find((c) => c.tag === 'path' || c.tag === 'line');
+    if (!g.attrs.id) { add('fail', 'missing-id', 'lifeline', 'lifeline has no id'); continue; }
+    let pts = null;
+    try { pts = line?.tag === 'line' ? [{ x: num(line.attrs.x1), y: num(line.attrs.y1) }, { x: num(line.attrs.x2), y: num(line.attrs.y2) }] : line ? pathPoints(line.attrs.d || '') : null; } catch { pts = null; }
+    if (!pts || pts.length < 2 || pts.some((p) => Math.abs(p.x - pts[0].x) > 0.5)) { add('fail', 'lifeline', `#${g.attrs.id}`, 'a lifeline needs one vertical <path d="Mx y1 Vy2"> as its child'); continue; }
+    const y0 = Math.min(...pts.map((p) => p.y)), y1 = Math.max(...pts.map((p) => p.y)), x = pts[0].x;
+    shapes.push({ id: g.attrs.id, kind: 'lifeline', r: { x, y: y0, w: 0, h: y1 - y0, r: x, b: y1 } });
   }
 
   /* painted shapes for the contrast background, in document order (later is on top) */
@@ -93,6 +105,7 @@ export function measure(src, theme) {
     try { pts = pathPoints(e.attrs.d || ''); } catch (err) { add('fail', 'edge-path', e.attrs.id ? `#${e.attrs.id}` : 'edge', err.message); continue; }
     if (pts.length < 2) { add('fail', 'edge-path', e.attrs.id ? `#${e.attrs.id}` : 'edge', 'path has fewer than two points'); continue; }
     const len = polyLength(pts);
+    if (len > 4 * (vb.w + vb.h)) { add('fail', 'edge-path', e.attrs.id ? `#${e.attrs.id}` : 'edge', `arrow is ${Math.round(len)} long, far outside the ${vb.w}x${vb.h} canvas; check its coordinates`); continue; }
     edges.push({
       id: e.attrs.id || '', from: e.attrs['data-from'] || '', to: e.attrs['data-to'] || '',
       head: !!(e.attrs['marker-end'] || (e.cs['marker-end'] && e.cs['marker-end'] !== 'none')), plain: classes(e).includes('plain'), len,

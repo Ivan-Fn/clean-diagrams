@@ -12,7 +12,8 @@ architecture and process figures; the others below are built from the same parts
 | Stages, tiers or zones, each holding several items | groups | `groups.svg` |
 | What changed: an approved or old path next to a new one | before / after | `before-after.svg` |
 | Where a trust or network boundary falls | flow or hub inside dashed containers | `flow.svg` + `group dashed` |
-| Layers stacked on each other | groups, one container per row, full width | `groups.svg`, rotated to rows |
+| Layers stacked on each other | groups, one container per row, full width | `groups.svg`, with the containers stacked as full-width rows |
+| Messages between parties in time order | sequence | `sequence.svg` |
 | Two options side by side | two small flows at the same scale, the difference in the accent | `flow.svg` twice |
 
 How much each box says depends on the question. Someone asking how a system works needs a
@@ -57,9 +58,12 @@ now outside the approval goes in a `label bad strong` under the new path.
 
 ## Sequence of messages between parties
 
-Lifelines are full-height `plain` vertical edges under a box per party. Messages are
-horizontal arrows between lifelines, top to bottom in time order, each with a label above
-it. Keep at most about eight messages; split longer exchanges.
+One box per party in a row at the top (four boxes of 150, centres 187 apart), and a
+lifeline from the bottom of each box down to the last message plus 24. Messages are
+horizontal arrows from one lifeline to another, top to bottom in time order, 40 apart,
+each ending exactly on the target lifeline's x. Replies are `dashed`. Each label sits 8
+above its arrow, centred between the first two lifelines the arrow spans, so it never
+crosses a lifeline. Keep at most about eight messages; split longer exchanges.
 
 ## Too big for one picture
 

@@ -17,14 +17,14 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { inflateRawSync, inflateSync } from 'node:zlib';
 import { basename } from 'node:path';
+import { parseArgs, requireFile } from './lib/args.mjs';
 
-const argv = process.argv.slice(2);
-const file = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--page');
-const pageArg = argv.includes('--page') ? Number(argv[argv.indexOf('--page') + 1]) : null;
-if (!file || !existsSync(file)) {
-  console.error('usage: node extract.mjs <file.drawio|.drawio.svg|.drawio.png|.excalidraw> [--page N]');
-  process.exit(2);
-}
+const USAGE = 'node extract.mjs <file.drawio|.drawio.svg|.drawio.png|.excalidraw> [--page N]';
+const args = parseArgs(process.argv.slice(2), { values: ['--page'], usage: USAGE });
+requireFile(args.positional[0], USAGE);
+const file = args.positional[0];
+const pageArg = args.values.has('--page') ? Number(args.values.get('--page')) : null;
+if (pageArg !== null && !(Number.isInteger(pageArg) && pageArg >= 1)) { console.error(`--page must be a page number from 1, got "${args.values.get('--page')}"\nusage: ${USAGE}`); process.exit(2); }
 
 const decodeEntities = (s) => s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
   .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
@@ -117,9 +117,11 @@ const drawio = (xml) => {
   const shapeName = (c) => c.st.shape || Object.keys(c.st).find((k) => c.st[k] === true && !['html', 'rounded', 'whiteSpace', 'text', 'container', 'group'].includes(k)) || (c.st.rounded === '1' ? 'rounded rect' : 'rect');
   const colours = (c) => [c.st.fillColor && c.st.fillColor !== 'none' ? `fill ${c.st.fillColor}` : '', c.st.strokeColor && c.st.strokeColor !== 'none' ? `stroke ${c.st.strokeColor}` : '', c.st.dashed === '1' ? 'dashed' : ''].filter(Boolean).join(', ');
   const name = (c) => stripHtml(c.value) || '(no label)';
-  const groups = vertices.filter((c) => isContainer(c) && !isText(c));
-  const boxes = vertices.filter((c) => !isContainer(c) && !isText(c));
-  const texts = vertices.filter(isText);
+  /* a vertex whose parent is an arrow is that arrow's label, never a box */
+  const onEdge = (c) => byId.get(c.parent)?.edge === '1' || c.st.edgeLabel === true;
+  const groups = vertices.filter((c) => !onEdge(c) && isContainer(c) && !isText(c));
+  const boxes = vertices.filter((c) => !onEdge(c) && !isContainer(c) && !isText(c));
+  const texts = vertices.filter((c) => !onEdge(c) && isText(c));
   const inside = (o, i) => i.x >= o.x && i.y >= o.y && i.x + i.w <= o.x + o.w && i.y + i.h <= o.y + o.h;
 
   out(`boxes: ${boxes.length} · containers: ${groups.length} · arrows: ${edges.length} · free text: ${texts.length}`);
@@ -136,7 +138,7 @@ const drawio = (xml) => {
   }
   if (edges.length) out('\narrows:');
   const edgeLabels = new Map();
-  for (const t of vertices.filter((v) => byId.get(v.parent)?.edge === '1')) {
+  for (const t of vertices.filter(onEdge)) {
     edgeLabels.set(t.parent, [edgeLabels.get(t.parent), name(t)].filter(Boolean).join(' / '));
   }
   for (const e of edges) {
@@ -144,7 +146,7 @@ const drawio = (xml) => {
     const heads = `${e.st.startArrow && e.st.startArrow !== 'none' ? '<' : ''}-${e.st.endArrow === 'none' ? '-' : '>'}`;
     out(`  ${e.source || '(loose)'} ${heads} ${e.target || '(loose)'}${label ? `  "${label}"` : ''}${e.st.dashed === '1' ? '  dashed' : ''}${e.st.strokeColor && e.st.strokeColor !== 'none' ? `  ${e.st.strokeColor}` : ''}`);
   }
-  const loose = texts.filter((t) => byId.get(t.parent)?.edge !== '1');
+  const loose = texts;
   if (loose.length) out('\nfree text:');
   for (const t of loose) { const a = abs(t); out(`  "${name(t)}"  at ${a.x},${a.y}`); }
 };

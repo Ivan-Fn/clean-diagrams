@@ -40,7 +40,7 @@ export function flatten(src, theme, opts = {}) {
     if (el.tag === '#text') return esc(el.text);
     if (el.tag === 'style') return '';
     const out = [];
-    for (const [k, v] of Object.entries(el.attrs)) if (KEEP_ATTRS.has(k) || k.startsWith('data-') || k.startsWith('aria-')) out.push(`${k}="${esc(v)}"`);
+    for (const [k, v] of Object.entries(el.attrs)) if (KEEP_ATTRS.has(k) || k.startsWith('xmlns') || k.startsWith('data-') || k.startsWith('aria-')) out.push(`${k}="${esc(v)}"`);
     const cs = el.cs || {};
     const props = el.tag === 'text' || el.tag === 'tspan' ? [...SHAPE, ...TEXT] : DRAWN.has(el.tag) ? [...SHAPE, ...MARKERS] : el.tag === 'g' ? ['opacity']
       : el.tag === 'stop' ? ['stop-color', 'stop-opacity'] : [];
@@ -61,7 +61,7 @@ export function flatten(src, theme, opts = {}) {
       out.push(`${p}="${esc(v)}"`);
     }
     const inner = el.children.map(write).join('');
-    return `<${el.tag}${out.length ? ` ${out.join(' ')}` : ''}${inner ? `>${inner}</${el.tag}>` : '/>'}`;
+    return `<${el.rawTag || el.tag}${out.length ? ` ${out.join(' ')}` : ''}${inner ? `>${inner}</${el.rawTag || el.tag}>` : '/>'}`;
   };
   return `<?xml version="1.0" encoding="UTF-8"?>\n${write(doc.svg)}\n`;
 }

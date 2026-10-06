@@ -28,9 +28,9 @@ nothing to install, and need no browser. Optional extras, used when present:
 
 | Extra | Adds | Install |
 |---|---|---|
-| `resvg`, `rsvg-convert` | PNG and PDF exports and preview images without a browser, drawn with the bundled Liberation Sans so they look the same on every machine | `nix profile install nixpkgs#resvg nixpkgs#librsvg` or `brew install resvg librsvg` |
+| `resvg` (PNG), `rsvg-convert` (PNG and PDF) | exports and preview images without a browser, drawn with the bundled Liberation Sans so they look the same on every machine | `nix profile install nixpkgs#resvg nixpkgs#librsvg` or `brew install resvg librsvg` |
 | Playwright with Chrome, Edge or its own Chromium | a second, render-based check pass and browser-rendered PNG and PDF | `npm install` in the skill's `scripts` folder; `npm run browser` for Chromium |
-| A running Chrome with a debug port | the same, without installing a browser | `CLEAN_DIAGRAMS_BROWSER=http://127.0.0.1:9222` |
+| A running Chrome with a debug port | the same, using a Chrome you already run (Playwright still needed) | `npm install`, then `CLEAN_DIAGRAMS_BROWSER=http://127.0.0.1:9222` |
 | draw.io desktop | `.drawio.svg` and `.drawio.png` exports | `brew install --cask drawio` |
 
 ## Use
@@ -41,6 +41,7 @@ Ask in plain words:
 - "Turn this Mermaid flowchart into a clean diagram for the README."
 - "Redraw `docs/arch.drawio` in the clean style and give me a PNG for the deck."
 - "Make a before and after diagram of the permission change, for the incident report."
+- "Draw the sign-in sequence between the app, the identity provider and the API."
 
 Claude writes the SVG, runs the checker until it reports no failures, looks at the light
 and dark renders, and exports the formats you need.
@@ -58,8 +59,8 @@ fonts, and fails on:
 - contrast below WCAG AA in either theme, and text under 11 pixels
 - boxes outside the canvas, too close to each other, or straddling a container's border
 
-When a browser is available it also renders the file in light, dark and Arial and runs
-the same checks on the render. `npm test` in the `scripts` folder proves each check fires
+When a browser is available it also renders the file in light, in dark, and with Arial
+forced as the font, and runs the same checks on each render. `npm test` in the `scripts` folder proves each check fires
 on a deliberately broken diagram, with and without a browser, and that the exports and
 the draw.io round trip work.
 
@@ -69,7 +70,7 @@ the draw.io round trip work.
 |---|---|
 | `skills/clean-diagrams/SKILL.md` | The instructions Claude follows |
 | `skills/clean-diagrams/references/` | Style and markup rules, layouts, importing, publishing |
-| `skills/clean-diagrams/templates/` | Four example diagrams to start from |
+| `skills/clean-diagrams/templates/` | Five example diagrams to start from |
 | `skills/clean-diagrams/scripts/` | Checker, exporter, draw.io converter, importer, tests |
 
 ## Licence

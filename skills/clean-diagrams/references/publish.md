@@ -3,6 +3,9 @@
 The SVG is the source; every format below is generated from it. Commit the SVG next to the
 document that uses it, and regenerate exports after each change.
 
+Contents: GitHub and other Markdown · MkDocs · tools that draw the SVG black · slides ·
+papers · draw.io · settings
+
 ## GitHub and other Markdown
 
 GitHub shows an SVG only as an image, from a file in the repository:
@@ -15,8 +18,8 @@ GitHub removes inline `<svg>` from Markdown, and an SVG shown as an image cannot
 fonts, scripts or other files. The templates need none of these. The image follows the
 reader's theme through the `prefers-color-scheme` rule inside the file.
 
-When a host themes its page with a class instead of a colour scheme the image can see, the
-image stays light. For those hosts, and for the most predictable result on GitHub, export
+Use the SVG itself by default. When a host themes its page with a class instead of a
+colour scheme the image can see, the image stays light; for those hosts, export
 fixed-theme files and use a `<picture>` element:
 
 ```bash
@@ -112,3 +115,17 @@ plain SVG text at the cost of one font size per box. For papers, prefer the PDF 
 
 Once people edit the `.drawio` file, it becomes the source and the SVG is out of date.
 Say which one is the source in the document or the commit.
+
+## Settings
+
+| Variable | Effect |
+|---|---|
+| `CLEAN_DIAGRAMS_BROWSER` | `none`, `auto` (default), `chromium`, `chrome`, `msedge`, or `http://host:port` for a Chrome started with `--remote-debugging-port`. Any browser needs Playwright (`npm install` in `scripts/`) |
+| `CLEAN_DIAGRAMS_RENDERER` | `resvg`, `rsvg-convert` or `inkscape`, to pick the renderer used without a browser. Inkscape uses the machine's fonts |
+| `CLEAN_DIAGRAMS_FONT_DIR` | a folder of `.ttf` files to use instead of the bundled Liberation Sans |
+| `CLEAN_DIAGRAMS_SYSTEM_FONTS` | `0` stops the renderers from falling back to the machine's fonts for CJK and emoji |
+| `DRAWIO_BIN` | path to the draw.io desktop executable, if it is not in the usual place |
+
+`check.mjs --browser-only` skips the Node measurement and runs only the browser pass, to
+compare the two. Without a browser, `check.mjs --out` also writes the flattened
+`<name>.check-light.svg` and `<name>.check-dark.svg` it rendered the previews from.

@@ -22,7 +22,7 @@ Read the source directly; no script is needed.
 | `A ==> B` | arrow; make it `accent` only when it is the path the diagram is about |
 | `A --- B` | `plain` line without a head |
 | `classDef`, `style`, `linkStyle` | ignored, except as a hint about which node the author meant to stress |
-| `sequenceDiagram` | the sequence layout in layouts.md |
+| `sequenceDiagram` | `templates/sequence.svg`: a box and lifeline per `participant`, an arrow per message; `->>` solid, `-->>` (a reply) `dashed` |
 
 A Mermaid node label with `<br>` becomes a name and a note.
 
@@ -38,7 +38,7 @@ and colours, arrows with label, line style and colour, and free text. Labels mad
 several lines show them separated by ` / `; the first part is usually the name.
 
 - Use the source positions to keep the author's arrangement: which boxes share a row,
-  which column is which. Rebuild the coordinates on the clean grid.
+  which column is which. Rebuild the coordinates from the sizes in style.md.
 - Source colours are not carried over. Decide the accent and status colours from meaning.
 - Shapes such as cylinders, clouds and actors become boxes; put the kind in the note when
   it matters ("database", "external user").

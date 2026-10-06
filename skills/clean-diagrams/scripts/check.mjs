@@ -28,24 +28,22 @@ import { measure } from './lib/measure-node.mjs';
 import { geometryProblems, colourProblems } from './lib/checks.mjs';
 import { openBrowser } from './lib/browser.mjs';
 import { flatten } from './lib/flatten.mjs';
+import { parseArgs, requireFile } from './lib/args.mjs';
 import { findRenderer, renderPng, BUNDLED_FONT } from './lib/render.mjs';
 
-const argv = process.argv.slice(2);
-const file = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--out');
-const outDir = argv.includes('--out') ? resolve(argv[argv.indexOf('--out') + 1]) : null;
-const QUIET = argv.includes('--quiet');
-if (!file || !existsSync(file)) {
-  console.error('usage: node check.mjs <diagram.svg> [--out <dir>] [--quiet]');
-  process.exit(2);
-}
-const SVG = resolve(file);
+const USAGE = 'node check.mjs <diagram.svg> [--out <dir>] [--quiet] [--browser-only]';
+const args = parseArgs(process.argv.slice(2), { flags: ['--quiet', '--browser-only'], values: ['--out'], usage: USAGE });
+requireFile(args.positional[0], USAGE);
+const outDir = args.values.has('--out') ? resolve(args.values.get('--out')) : null;
+const QUIET = args.flags.has('--quiet');
+const SVG = resolve(args.positional[0]);
 const SRC = readFileSync(SVG, 'utf8');
 const NAME = basename(SVG, '.svg');
 
 /* Runs inside the page: the same model measure-node.mjs builds, measured by the browser. */
 const MEASURE_IN_PAGE = (fallbackFont) => {
   /* same sampling as sampleSteps() in lib/checks.mjs: every 2 units, 4 in from each end */
-  const steps = (len) => { const out = []; for (let d = 4; d < len - 1; d += 2) out.push(d); return out; };
+  const steps = (len) => { const step = Math.max(2, len / 4000); const out = []; for (let d = 4; d < len - 1; d += step) out.push(d); return out; };
   const svg = document.documentElement;
   if (svg.tagName.toLowerCase() !== 'svg') return { error: 'not-svg' };
   if (fallbackFont) {
@@ -64,6 +62,10 @@ const MEASURE_IN_PAGE = (fallbackFont) => {
   for (const g of svg.querySelectorAll('g.node, g.group')) {
     const rect = g.querySelector(':scope > rect');
     if (g.id && rect) shapes.push({ id: g.id, kind: g.classList.contains('node') ? 'node' : 'group', r: box(rect.getBBox()) });
+  }
+  for (const g of svg.querySelectorAll('g.lifeline')) {
+    const line = g.querySelector(':scope > path, :scope > line');
+    if (g.id && line) { const b = line.getBBox(); shapes.push({ id: g.id, kind: 'lifeline', r: { x: b.x + b.width / 2, y: b.y, w: 0, h: b.height, r: b.x + b.width / 2, b: b.y + b.height } }); }
   }
   const painted = [...svg.querySelectorAll('rect, circle, ellipse, polygon, path')].filter((el) => !el.closest('defs, marker') && !el.classList.contains('edge'));
   /* opacity multiplies down the tree; getComputedStyle reports only the element's own */
@@ -111,7 +113,7 @@ const report = (problems, note = '') => {
 };
 
 /* 1. no browser: always, unless --browser-only (used to compare the two passes) */
-const BROWSER_ONLY = argv.includes('--browser-only');
+const BROWSER_ONLY = args.flags.has('--browser-only');
 const light = measure(SRC, 'light');
 let dims = light.W ? { W: light.W, H: light.H } : null;
 if (!BROWSER_ONLY) report(light.problems);
@@ -141,8 +143,11 @@ if (opened) {
       }
       if (outDir && !font) {
         mkdirSync(outDir, { recursive: true });
-        await page.setViewportSize({ width: Math.ceil(dims.W), height: Math.ceil(dims.H) });
-        await page.screenshot({ path: join(outDir, `${NAME}.check-${theme}.png`), clip: { x: 0, y: 0, width: dims.W, height: dims.H } });
+        const size = dims || (m.W ? { W: m.W, H: m.H } : null);
+        if (size) {
+          await page.setViewportSize({ width: Math.ceil(size.W), height: Math.ceil(size.H) });
+          await page.screenshot({ path: join(outDir, `${NAME}.check-${theme}.png`), clip: { x: 0, y: 0, width: size.W, height: size.H } });
+        }
         previews = opened.kind;
       }
       await ctx.close();
@@ -153,7 +158,7 @@ if (opened) {
 }
 
 /* 3. previews without a browser */
-if (outDir && previews === 'none' && dims) {
+if (outDir && previews === 'none' && dims && !BROWSER_ONLY) {
   mkdirSync(outDir, { recursive: true });
   const renderer = findRenderer();
   for (const theme of ['light', 'dark']) {
