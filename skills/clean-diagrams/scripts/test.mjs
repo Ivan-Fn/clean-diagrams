@@ -9,8 +9,9 @@
  * output. A case whose edit did not apply fails, so a stale case cannot pass silently.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { inflateSync } from 'node:zlib';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,6 +108,30 @@ if (outs.every(existsSync)) {
   const skippedPng = /skipped PNG/.test(r.out), skippedPdf = /skipped PDF/.test(r.out);
   result((png || skippedPng) && (pdf || skippedPdf), `export without a browser: PNG ${png ? 'written' : 'skipped with a note'}, PDF ${pdf ? 'written' : 'skipped with a note'}`, r.out.trim().split('\n').slice(-2).join(' | '));
   if (png) result(readFileSync(join(nb, 'before-after.png')).readUInt32BE(16) === 1520, 'renderer PNG is 2x the viewBox width');
+  if (pdf) {
+    /* page objects may sit in compressed object streams: search the inflated streams too */
+    const raw = readFileSync(join(nb, 'before-after.pdf'));
+    const parts = [raw.toString('latin1')];
+    for (const m of raw.toString('latin1').matchAll(/stream\r?\n/g)) {
+      const start = m.index + m[0].length, end = raw.indexOf('endstream', start);
+      try { parts.push(inflateSync(raw.subarray(start, end)).toString('latin1')); } catch { /* not deflated */ }
+    }
+    const bytes = parts.join('\n');
+    const box = bytes.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)/);
+    result(!!box && Math.round(Number(box[1])) === 570 && Math.round(Number(box[2])) === 270, 'renderer PDF is the diagram\'s size (760x360 px = 570x270 pt)', box ? `${box[1]}x${box[2]}` : 'no MediaBox');
+    /* fonts in the PDF, if any, must be the bundled one: never a substitute */
+    const fonts = [...bytes.matchAll(/\/BaseFont\s*\/([\w+-]+)/g)].map((m) => m[1]);
+    result(fonts.every((f) => /LiberationSans/.test(f)), 'renderer PDF uses only the bundled font', fonts.join(', ') || 'text outlined, no font objects');
+  }
+  if (png || pdf) {
+    /* with no font anywhere, the export must fail and leave nothing at the output path */
+    const empty = join(WORK, 'empty-fonts'), out = join(WORK, 'nofont');
+    mkdirSync(empty, { recursive: true });
+    const f = run('export.mjs', [src, '--png', '--pdf', '--out', out], { CLEAN_DIAGRAMS_BROWSER: 'none', CLEAN_DIAGRAMS_FONT_DIR: empty, CLEAN_DIAGRAMS_SYSTEM_FONTS: '0' });
+    const left = ['before-after.png', 'before-after.dark.png', 'before-after.pdf'].filter((x) => existsSync(join(out, x)));
+    result(f.code === 1 && /font/i.test(f.out) && left.length === 0 || (f.code === 1 && /font/i.test(f.out) && !png && left.length === 0),
+      'export with no usable font fails and writes no picture', `exit ${f.code}; left: ${left.join(', ') || 'none'}; ${f.out.trim().split('\n').pop()}`);
+  }
 }
 
 /* 4. draw.io conversion and the round trip through extract */

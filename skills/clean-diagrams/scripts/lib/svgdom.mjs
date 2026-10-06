@@ -57,9 +57,10 @@ export function parse(src) {
       continue;
     }
     if (!m[4]) continue;                                   /* comment, PI, doctype */
-    const tag = m[4].replace(/^svg:/, '');
+    const rawTag = m[4];
+    const tag = rawTag.replace(/^svg:/, '');
     if (m[3] === '/') {
-      if (cur.tag !== tag) { errors.push(`line ${line(m.index)}: closing </${tag}> does not match the open <${cur.tag}>`); }
+      if (cur.rawTag !== rawTag) { errors.push(`line ${line(m.index)}: closing </${tag}> does not match the open <${cur.tag}>`); }
       else cur = cur.parent;
       continue;
     }
@@ -68,7 +69,7 @@ export function parse(src) {
       if (a[1] in attrs) errors.push(`line ${line(m.index)}: attribute "${a[1]}" appears twice on <${tag}>`);
       attrs[a[1]] = decodeStrict(a[2] ?? a[3], errors, `in the ${a[1]} attribute on line ${line(m.index)}`);
     }
-    const el = { tag, attrs, children: [], parent: cur };
+    const el = { tag, rawTag, attrs, children: [], parent: cur };
     cur.children.push(el);
     if (!m[6]) cur = el;
   }
@@ -76,6 +77,16 @@ export function parse(src) {
   if (cur !== root) errors.push(`<${cur.tag}> is never closed`);
   const tops = root.children.filter((c) => c.tag[0] !== '#');
   if (tops.length !== 1) errors.push(`an XML file has one root element; found ${tops.length}`);
+  if (root.children.some((c) => c.tag === '#text' && c.text.trim())) errors.push('there is text outside the <svg> element');
+  /* every prefix (xlink:href, svg:rect) must be declared by an xmlns:prefix on the element or an ancestor */
+  const declared = (el, prefix) => { for (let p = el; p && p.tag !== '#root'; p = p.parent) if (p.attrs[`xmlns:${prefix}`] != null) return true; return false; };
+  for (const el of elements(root)) {
+    const names = [el.rawTag || el.tag, ...Object.keys(el.attrs)];
+    for (const n of names) {
+      const m = n.match(/^([\w.-]+):/);
+      if (m && m[1] !== 'xmlns' && m[1] !== 'xml' && !declared(el, m[1])) errors.push(`"${n}" uses the prefix "${m[1]}" without declaring xmlns:${m[1]}`);
+    }
+  }
   const svg = tops.find((c) => c.tag === 'svg');
   return { root, svg, errors: [...new Set(errors)] };
 }
@@ -123,7 +134,7 @@ function parseBlocks(css) {
       while (j < text.length && depth) { if (text[j] === '{') depth++; else if (text[j] === '}') depth--; j++; }
       const body = text.slice(open + 1, j - 1);
       if (head.startsWith('@media')) walk(body, [media, head.slice(6).trim()].filter(Boolean).join(' and '));
-      else if (head.startsWith('@')) out.push({ media, selector: head, decls: [], at: true });
+      else if (head.startsWith('@')) out.push({ media, selector: head.split(/\s+/)[0], decls: [], at: true });
       else {
         const decls = splitDecls(body);
         for (const sel of head.split(',').map((s) => s.trim()).filter(Boolean)) out.push({ media, selector: sel, decls });
@@ -131,9 +142,12 @@ function parseBlocks(css) {
       i = j;
     }
   };
-  walk(stripComments(css), null);
+  const text = stripComments(css);
+  for (const m of text.matchAll(/@(import|charset|namespace|layer)\b[^;{]*;/g)) out.push({ media: null, selector: `@${m[1]}`, decls: [], at: true });
+  walk(text.replace(/@(import|charset|namespace|layer)\b[^;{]*;/g, ''), null);
   return out;
 }
+const UNKNOWN_MEDIA = new Set();
 const mediaApplies = (media, theme) => {
   if (media == null) return true;
   return media.toLowerCase().split(/\s*,\s*/).some((q) => {
@@ -147,7 +161,8 @@ const mediaApplies = (media, theme) => {
       if (p === 'print' || p === 'speech') { ok = false; continue; }
       const s = p.match(/^\(\s*prefers-color-scheme\s*:\s*(dark|light)\s*\)$/);
       if (s) { if (s[1] !== theme) ok = false; continue; }
-      ok = false;                                     /* unknown feature: assume it does not match */
+      UNKNOWN_MEDIA.add(p);                           /* reported by computeStyles */
+      ok = false;
     }
     return neg ? !ok : ok;
   });
@@ -188,22 +203,33 @@ function compileSelector(sel) {
 
 const INHERITED = new Set(['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'fill-opacity', 'stroke-opacity',
   'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'color', 'visibility', 'letter-spacing', 'dominant-baseline',
-  'marker-start', 'marker-mid', 'marker-end']);
+  'marker-start', 'marker-mid', 'marker-end', 'text-transform']);
 const PRESENTATION = ['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'fill-opacity', 'stroke-opacity', 'opacity',
   'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'color', 'display', 'visibility', 'letter-spacing', 'dominant-baseline',
-  'alignment-baseline', 'marker-start', 'marker-mid', 'marker-end'];
+  'alignment-baseline', 'marker-start', 'marker-mid', 'marker-end', 'stop-color', 'stop-opacity'];
 const INITIAL = { fill: '#000000', stroke: 'none', 'stroke-width': '1', 'fill-opacity': '1', 'stroke-opacity': '1', opacity: '1', 'font-size': '16',
   'font-weight': '400', 'text-anchor': 'start', 'font-family': 'sans-serif', 'stroke-dasharray': 'none', display: 'inline', visibility: 'visible',
   'letter-spacing': 'normal' };
-const SUPPORTED_PROPS = new Set([...PRESENTATION, 'font', 'stroke-dashoffset', 'animation', 'paint-order', 'shape-rendering', 'text-rendering', 'font-variant', 'white-space']);
+const SUPPORTED_PROPS = new Set([...PRESENTATION, 'font', 'text-transform', 'stop-color', 'stop-opacity', 'stroke-dashoffset', 'animation', 'paint-order', 'shape-rendering', 'text-rendering', 'white-space']);
+const SIZE_KEYWORDS = { 'xx-small': 9, 'x-small': 10, small: 13, medium: 16, large: 18, 'x-large': 24, 'xx-large': 32, 'xxx-large': 48 };
+/* font: [style] [variant] [weight] size[/line-height] family */
+const expandFont = (v) => {
+  const m = String(v).match(/^\s*((?:(?:italic|oblique|normal|small-caps|bold|bolder|lighter|[1-9]00)\s+)*)([\d.]+(?:px|pt|em|rem|%)?|xx-small|x-small|small|medium|large|x-large|xx-large)(?:\/\S+)?\s+(.+)$/i);
+  if (!m) return null;
+  const pre = m[1].trim().split(/\s+/).filter(Boolean);
+  return { 'font-style': pre.find((x) => /italic|oblique/i.test(x)) || 'normal', 'font-weight': pre.find((x) => /^(bold|bolder|lighter|[1-9]00)$/i.test(x)) || '400', 'font-size': m[2], 'font-family': m[3] };
+};
+const TRANSFORMED = new Set(['text-transform']);
 
 /* Resolve every element's style for one theme. Sets el.cs = { prop: value } (custom
    properties included) and el.op = the element's opacity times its ancestors'. */
 export function computeStyles(doc, theme) {
   const css = elements(doc.root).filter((e) => e.tag === 'style').map(textOf).join('\n');
   const parsed = parseBlocks(css);
+  UNKNOWN_MEDIA.clear();
   const rules = parsed.filter((r) => !r.at && mediaApplies(r.media, theme)).map((r, order) => ({ ...r, order, sel: compileSelector(r.selector) }));
-  const unsupported = [...new Set(rules.filter((r) => !r.sel).map((r) => r.selector))];
+  const unsupported = [...new Set([...rules.filter((r) => !r.sel).map((r) => r.selector), ...parsed.filter((r) => r.at).map((r) => `${r.selector} block`), ...[...UNKNOWN_MEDIA].map((m) => `@media ${m}`)])];
+  const valueProblems = [];
   const unknownProps = [...new Set(rules.flatMap((r) => r.decls.map(([k]) => k)).filter((k) => !k.startsWith('--') && !SUPPORTED_PROPS.has(k)))];
   const visit = (el, parentCs, parentOp) => {
     if (el.tag[0] === '#') return;
@@ -212,10 +238,17 @@ export function computeStyles(doc, theme) {
     for (const p of PRESENTATION) if (el.attrs[p] != null) cs[p] = el.attrs[p];
     const matched = rules.filter((r) => r.sel && r.sel.test(el)).sort((a, b) => a.sel.spec - b.sel.spec || a.order - b.order);
     const inline = el.attrs.style ? splitDecls(el.attrs.style) : [];
-    for (const r of matched) for (const [k, v, imp] of r.decls) if (!imp) cs[k] = v;
-    for (const [k, v, imp] of inline) if (!imp) cs[k] = v;
-    for (const r of matched) for (const [k, v, imp] of r.decls) if (imp) cs[k] = v;
-    for (const [k, v, imp] of inline) if (imp) cs[k] = v;
+    const set = (k, v) => {
+      if (k === 'font') {
+        const f = expandFont(v);
+        if (!f) { valueProblems.push(`font shorthand "${v}" cannot be read; write font-size, font-weight and font-family separately`); return; }
+        Object.assign(cs, f);
+      } else cs[k] = v;
+    };
+    for (const r of matched) for (const [k, v, imp] of r.decls) if (!imp) set(k, v);
+    for (const [k, v, imp] of inline) if (!imp) set(k, v);
+    for (const r of matched) for (const [k, v, imp] of r.decls) if (imp) set(k, v);
+    for (const [k, v, imp] of inline) if (imp) set(k, v);
     const resolveVar = (v, depth = 0) => (typeof v === 'string' && v.includes('var(') && depth < 8
       ? resolveVar(v.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^)]*))?\)/g, (_, name, fb) => cs[name] ?? fb ?? ''), depth + 1) : v);
     for (const k of Object.keys(cs)) {
@@ -230,6 +263,9 @@ export function computeStyles(doc, theme) {
       else if (/rem$/.test(fs)) cs['font-size'] = String(parseFloat(fs) * 16);
       else if (/%$/.test(fs)) cs['font-size'] = String((parseFloat(fs) / 100) * pfs);
       else if (/pt$/.test(fs)) cs['font-size'] = String(parseFloat(fs) * (4 / 3));
+      else if (fs in SIZE_KEYWORDS) cs['font-size'] = String(SIZE_KEYWORDS[fs]);
+      else if (fs === 'larger' || fs === 'smaller') cs['font-size'] = String(pfs * (fs === 'larger' ? 1.2 : 1 / 1.2));
+      else if (!/^[\d.]+(px)?$/.test(fs)) { valueProblems.push(`font-size "${fs}" cannot be measured without a browser; use px`); cs['font-size'] = String(pfs); }
     }
     if (/^currentcolor$/i.test(cs.fill || '')) cs.fill = cs.color || '#000000';
     if (/^currentcolor$/i.test(cs.stroke || '')) cs.stroke = cs.color || '#000000';
@@ -240,7 +276,7 @@ export function computeStyles(doc, theme) {
     for (const c of el.children) visit(c, cs, el.op);
   };
   if (doc.svg) visit(doc.svg, {}, 1);
-  return { unsupported, unknownProps };
+  return { unsupported, unknownProps, valueProblems: [...new Set(valueProblems)] };
 }
 
 /* ------------------------------------------------------------------ values */
@@ -291,8 +327,17 @@ const isEmoji = (cp) => (cp >= 0x1f000 && cp <= 0x1faff) || (cp >= 0x2600 && cp 
 const isZeroWidth = (cp) => (cp >= 0x300 && cp <= 0x36f) || cp === 0x200b || cp === 0x200c || cp === 0x200d || (cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0x1f3fb && cp <= 0x1f3ff) || (cp >= 0xe0020 && cp <= 0xe007f);
 /* the next measured size at or above `size`, so a size between two columns is never under-measured */
 const sizeColumn = (size) => W.sizes.find((s) => s >= size - 1e-9) ?? W.sizes[W.sizes.length - 1];
-export function textWidth(str, size, wt, letterSpacing = 0) {
-  const col = (wt >= 600 ? W.bold : W.regular)[sizeColumn(size)];
+const MONO = /mono|courier|consolas|menlo|monaco|code|fixed/i;
+export const isMonospace = (family) => {
+  const first = String(family || '').split(',').map((s) => s.trim().replace(/["']/g, '')).find((s) => !/^(ui-sans-serif|-apple-system|BlinkMacSystemFont|system-ui)$/i.test(s)) || '';
+  return MONO.test(first) || /^ui-monospace$/i.test(String(family).split(',')[0].trim());
+};
+export function textWidth(str, size, wt, letterSpacing = 0, mono = false) {
+  if (mono) return [...str].filter((c) => !isZeroWidth(c.codePointAt(0))).length * (0.62 * size + letterSpacing);
+  /* weight 500 renders between regular and semibold: measure it as semibold. Above 24 px
+     glyph widths stop shrinking with size; keep a 3% margin for the last column. */
+  const col = (wt >= 500 ? W.bold : W.regular)[sizeColumn(size)];
+  const big = size > W.sizes[W.sizes.length - 1] ? 1.03 : 1;
   let em = 0, n = 0, prevEmoji = false;
   for (const ch of str) {
     const cp = ch.codePointAt(0);
@@ -303,8 +348,9 @@ export function textWidth(str, size, wt, letterSpacing = 0) {
     em += i != null ? col[i] / 1000 : isCJK(cp) ? W.cjk / 1000 : 1.0;   /* unknown script: a full em, never narrower */
     n++;
   }
-  return em * size + n * letterSpacing;
+  return em * size * big + n * letterSpacing;
 }
+const transform = (s, t) => (t === 'uppercase' ? s.toUpperCase() : t === 'lowercase' ? s.toLowerCase() : t === 'capitalize' ? s.replace(/(^|\s)(\S)/g, (_, a, b) => a + b.toUpperCase()) : s);
 const lsOf = (cs, size) => {
   const v = cs['letter-spacing'];
   if (!v || v === 'normal') return 0;
@@ -318,8 +364,8 @@ export function textLines(el) {
     if (!s) return;
     const cs = node.cs || el.cs;
     const size = num(cs['font-size'], 16), wt = weight(cs['font-weight']);
-    if (!cur) { cur = { x, y, anchor: el.cs['text-anchor'], runs: [] }; lines.push(cur); }
-    cur.runs.push({ s, size, wt, ls: lsOf(cs, size), hidden: !!node.hidden });
+    if (!cur) { cur = { x, y, anchor: (node.cs || el.cs)['text-anchor'], runs: [] }; lines.push(cur); }
+    cur.runs.push({ s: transform(s, cs['text-transform']), size, wt, ls: lsOf(cs, size), mono: isMonospace(cs['font-family']), hidden: !!node.hidden });
   };
   for (const c of el.children) {
     if (c.tag === '#text') { push(el, c.text.replace(/\s+/g, ' ')); continue; }
@@ -346,7 +392,7 @@ export function textLines(el) {
 }
 export function textBox(el) {
   const boxes = textLines(el).map((l) => {
-    const w = l.runs.reduce((s, r) => s + textWidth(r.s, r.size, r.wt, r.ls), 0);
+    const w = l.runs.reduce((s, r) => s + textWidth(r.s, r.size, r.wt, r.ls, r.mono), 0);
     const size = Math.max(...l.runs.map((r) => r.size));
     const left = l.anchor === 'middle' ? l.x - w / 2 : l.anchor === 'end' ? l.x - w : l.x;
     const h = (ASCENT + DESCENT) * size;
@@ -413,6 +459,16 @@ export function shapeBox(el) {
   if (el.tag === 'rect') return rectBox(el);
   if (el.tag === 'circle') { const r = num(a.r); return { x: num(a.cx) - r, y: num(a.cy) - r, w: 2 * r, h: 2 * r, r: num(a.cx) + r, b: num(a.cy) + r }; }
   if (el.tag === 'ellipse') { const rx = num(a.rx), ry = num(a.ry); return { x: num(a.cx) - rx, y: num(a.cy) - ry, w: 2 * rx, h: 2 * ry, r: num(a.cx) + rx, b: num(a.cy) + ry }; }
+  if (el.tag === 'path' || el.tag === 'polygon') {
+    /* the box around every coordinate pair: exact for straight edges, a little generous for curves */
+    const nums = String(a.d ?? a.points ?? '').match(/-?\d*\.?\d+(?:e[-+]?\d+)?/g)?.map(Number) || [];
+    let pts;
+    try { pts = el.tag === 'path' ? pathPoints(a.d) : null; } catch { pts = null; }
+    const xs = pts ? pts.map((p) => p.x) : nums.filter((_, i) => i % 2 === 0), ys = pts ? pts.map((p) => p.y) : nums.filter((_, i) => i % 2 === 1);
+    if (!xs.length) return null;
+    const x = Math.min(...xs), y = Math.min(...ys), r = Math.max(...xs), b = Math.max(...ys);
+    return { x, y, w: r - x, h: b - y, r, b, approx: !pts };
+  }
   return null;
 }
 export const viewBox = (svg) => {

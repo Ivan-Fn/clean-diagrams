@@ -28,7 +28,7 @@ nothing to install, and need no browser. Optional extras, used when present:
 
 | Extra | Adds | Install |
 |---|---|---|
-| `resvg`, `rsvg-convert` | PNG and PDF exports and preview images without a browser | `nix profile install nixpkgs#resvg nixpkgs#librsvg` or `brew install resvg librsvg` |
+| `resvg`, `rsvg-convert` | PNG and PDF exports and preview images without a browser, drawn with the bundled Liberation Sans so they look the same on every machine | `nix profile install nixpkgs#resvg nixpkgs#librsvg` or `brew install resvg librsvg` |
 | Playwright with Chrome, Edge or its own Chromium | a second, render-based check pass and browser-rendered PNG and PDF | `npm install` in the skill's `scripts` folder; `npm run browser` for Chromium |
 | A running Chrome with a debug port | the same, without installing a browser | `CLEAN_DIAGRAMS_BROWSER=http://127.0.0.1:9222` |
 | draw.io desktop | `.drawio.svg` and `.drawio.png` exports | `brew install --cask drawio` |
@@ -74,4 +74,6 @@ the draw.io round trip work.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The bundled Liberation Sans font files in
+`skills/clean-diagrams/scripts/fonts/` are under the SIL Open Font License 1.1; see
+`LICENSE-LiberationSans.txt` in that folder.

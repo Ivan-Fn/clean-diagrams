@@ -62,12 +62,13 @@ large screens. Keep the dark PNG for dark slide templates.
 Without a browser, PNGs come from `resvg` (closest to the browser render) or
 `rsvg-convert`, and PDFs from `rsvg-convert`, whichever is on PATH. Install them with
 `nix profile install nixpkgs#resvg nixpkgs#librsvg` or `brew install resvg librsvg`, or
-pick one with `CLEAN_DIAGRAMS_RENDERER=resvg`. They draw with the machine's fonts: Helvetica
-Neue on a Mac, Liberation Sans or DejaVu Sans on most Linux machines, where a browser on a
-Mac uses the system font. Names come out bold where a browser draws semibold. A machine
-with no usable font makes the export fail with a message, never a picture without text;
-install one (`nix profile install nixpkgs#liberation_ttf`) or point
-`CLEAN_DIAGRAMS_FONT_DIR` at a folder of `.ttf` files.
+pick one with `CLEAN_DIAGRAMS_RENDERER=resvg`. Both draw with Liberation Sans, which ships
+with the skill in `scripts/fonts/` (SIL Open Font License), so the picture is the same on
+every machine and every label the checker passed fits. Liberation Sans has Arial's widths;
+names come out bold where a browser draws semibold. Text that needs other scripts (CJK,
+emoji) uses the machine's fonts for those characters. If any character finds no font, the
+export fails with a message and writes no file, so there is never a picture with missing
+text. `CLEAN_DIAGRAMS_FONT_DIR` points the renderers at another folder of `.ttf` files.
 
 ## Papers and print
 
@@ -75,8 +76,10 @@ install one (`nix profile install nixpkgs#liberation_ttf`) or point
 node scripts/export.mjs diagram.svg --pdf
 ```
 
-writes a single-page PDF exactly the size of the diagram, light theme, with text kept as
-vector text and the fonts embedded. In LaTeX: `\includegraphics[width=\linewidth]{diagram.pdf}`.
+writes a single-page PDF exactly the size of the diagram, light theme, all vector. With a
+browser the text stays selectable, with the fonts embedded. Without one, the text is
+outlined from the bundled Liberation Sans (by `usvg`, which comes with resvg), so the PDF
+looks the same on every machine but its words cannot be selected or searched. In LaTeX: `\includegraphics[width=\linewidth]{diagram.pdf}`.
 
 The PDF page is 760 by H pixels at 96 per inch, so 7.9 inches wide. Scaled into a
 two-column paper's 3.3-inch column, an 11.5 label prints at under 4 points, too small to

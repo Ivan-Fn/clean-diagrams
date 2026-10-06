@@ -46,6 +46,7 @@ const read = (theme) => {
     dash: el.cs['stroke-dasharray'] && el.cs['stroke-dasharray'] !== 'none' ? el.cs['stroke-dasharray'].replace(/px/g, '').replace(/,\s*/g, ' ').trim() : '' });
   const txt = (t) => ({ s: textOf(t).trim().replace(/\s+/g, ' '), size: num(t.cs['font-size'], 16), weight: weight(t.cs['font-weight']),
     color: toHex(t.cs.fill), anchor: t.cs['text-anchor'], box: bb(textBox(t)), x: num(t.attrs.x), y: num(t.attrs.y), cls: t.attrs.class || '' });
+  for (const g of all.filter(isShape)) if (!g.attrs.id || !g.children.some((c) => c.tag === 'rect')) console.error(`to-drawio: skipped a ${hasClass(g, 'node') ? 'box' : 'container'} ${g.attrs.id ? `#${g.attrs.id}` : 'without an id'}: it needs an id and a <rect>. Run check.mjs first.`);
   const shapes = all.filter(isShape).filter((g) => g.attrs.id && g.children.some((c) => c.tag === 'rect')).map((g) => {
     const rect = g.children.find((c) => c.tag === 'rect');
     return { id: g.attrs.id, kind: hasClass(g, 'node') ? 'node' : 'group', rect: bb(rectBox(rect)), rx: num(rect.attrs.rx),
@@ -56,7 +57,7 @@ const read = (theme) => {
     try { pts = pathPoints(p.attrs.d || ''); } catch (err) { throw new Error(`arrow ${p.attrs.id || i + 1}: ${err.message}. Run check.mjs first.`); }
     const len = polyLength(pts), n = Math.max(2, Math.ceil(len / 4));
     return { id: p.attrs.id || `edge-${i + 1}`, from: p.attrs['data-from'], to: p.attrs['data-to'], d: p.attrs.d, paint: paint(p), mid: pointAt(pts, len / 2),
-      head: !!p.attrs['marker-end'], samples: Array.from({ length: n }, (_, i) => pointAt(pts, (len * i) / (n - 1))) };
+      head: !!(p.attrs['marker-end'] || (p.cs['marker-end'] && p.cs['marker-end'] !== 'none')), samples: Array.from({ length: n }, (_, i) => pointAt(pts, (len * i) / (n - 1))) };
   });
   const free = all.filter((t) => t.tag === 'text' && textOf(t).trim() && !closest(t, isShape)).map(txt);
   const loose = all.filter((r) => r.tag === 'rect' && !closest(r, isShape) && !hasClass(r, 'bg')).map((r) => ({ rect: bb(rectBox(r)), rx: num(r.attrs.rx), paint: paint(r) }));

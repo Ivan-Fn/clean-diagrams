@@ -47,6 +47,11 @@ export function geometryProblems(m) {
           : `make the box taller or move the line: its text spans ${Math.round(t.r.y)} to ${Math.round(t.r.b)}, the box ${Math.round(s.r.y)} to ${Math.round(s.r.b)}`;
         add('fail', 'text-outside-box', `#${s.id}`, `"${t.label}" (${Math.ceil(t.r.w)}x${Math.ceil(t.r.h)}) does not fit inside its box (${Math.round(s.r.w)}x${Math.round(s.r.h)}); ${fix}`);
       }
+      /* the box's or container's own text must not sit under another box drawn over it */
+      for (const n of m.shapes) {
+        if (n.id === s.id || n.kind !== 'node') continue;
+        if (overlap(t.r, n.r, 1)) add('fail', 'text-under-box', t.where, `"${t.label}" is covered by #${n.id}; move the text or the box`);
+      }
     } else {
       for (const n of m.shapes) {
         if (overlap(t.r, n.r) && !contains(n.r, t.r)) add('fail', 'text-on-border', t.where, `"${t.label}" crosses the border of #${n.id}`);
@@ -63,6 +68,12 @@ export function geometryProblems(m) {
   }
   for (const grp of m.shapes.filter((s) => s.kind === 'group')) for (const n of nodes) {
     if (overlap(grp.r, n.r) && !contains(grp.r, n.r)) add('fail', 'straddles-group', `#${n.id}`, `#${n.id} crosses the border of #${grp.id}`);
+  }
+  const seenPaths = new Map();
+  for (const e of m.edges) {
+    const sig = [e.P0, e.P1, ...e.samples.filter((_, i) => i % 5 === 0)].map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(' ');
+    if (seenPaths.has(sig)) add('warn', 'edge-duplicate', e.id ? `#${e.id}` : 'edge', `draws exactly over ${seenPaths.get(sig)}; one of the two arrows is hidden`);
+    else seenPaths.set(sig, e.id ? `#${e.id}` : 'another arrow');
   }
   for (const e of m.edges) {
     const id = e.id ? `#${e.id}` : `edge ${e.from}->${e.to}`;
@@ -99,4 +110,6 @@ export function colourProblems(m, theme) {
 }
 
 /* d = 4, 6, 8 … len-4: the same sampling the browser uses via getPointAtLength */
-export const sampleSteps = (len) => { const out = []; for (let d = 4; d < len - 4; d += 2) out.push(d); return out; };
+/* d = 4, 6, 8 … up to 1 before the end, so an arrowhead lying over a label is caught; the
+   same sampling the browser pass uses via getPointAtLength */
+export const sampleSteps = (len) => { const out = []; for (let d = 4; d < len - 1; d += 2) out.push(d); return out; };

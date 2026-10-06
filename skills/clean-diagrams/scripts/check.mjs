@@ -2,7 +2,7 @@
 /**
  * check.mjs — report layout, arrow and contrast defects in a clean-diagrams SVG.
  *
- *   node check.mjs <diagram.svg> [--out <dir>] [--quiet]
+ *   node check.mjs <diagram.svg> [--out <dir>] [--quiet] [--browser-only]
  *
  * Needs only Node. It reads the SVG, applies its stylesheet for the light and the dark
  * theme, measures text with a table of character widths taken from the widest common
@@ -28,7 +28,7 @@ import { measure } from './lib/measure-node.mjs';
 import { geometryProblems, colourProblems } from './lib/checks.mjs';
 import { openBrowser } from './lib/browser.mjs';
 import { flatten } from './lib/flatten.mjs';
-import { findRenderer, renderPng } from './lib/render.mjs';
+import { findRenderer, renderPng, BUNDLED_FONT } from './lib/render.mjs';
 
 const argv = process.argv.slice(2);
 const file = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--out');
@@ -45,7 +45,7 @@ const NAME = basename(SVG, '.svg');
 /* Runs inside the page: the same model measure-node.mjs builds, measured by the browser. */
 const MEASURE_IN_PAGE = (fallbackFont) => {
   /* same sampling as sampleSteps() in lib/checks.mjs: every 2 units, 4 in from each end */
-  const steps = (len) => { const out = []; for (let d = 4; d < len - 4; d += 2) out.push(d); return out; };
+  const steps = (len) => { const out = []; for (let d = 4; d < len - 1; d += 2) out.push(d); return out; };
   const svg = document.documentElement;
   if (svg.tagName.toLowerCase() !== 'svg') return { error: 'not-svg' };
   if (fallbackFont) {
@@ -110,18 +110,20 @@ const report = (problems, note = '') => {
   }
 };
 
-/* 1. no browser: always */
+/* 1. no browser: always, unless --browser-only (used to compare the two passes) */
+const BROWSER_ONLY = argv.includes('--browser-only');
 const light = measure(SRC, 'light');
 let dims = light.W ? { W: light.W, H: light.H } : null;
-report(light.problems);
-if (!light.error) {
+if (!BROWSER_ONLY) report(light.problems);
+if (!light.error && !BROWSER_ONLY) {
   report(geometryProblems(light));
   report(colourProblems(light, 'light'));
   report(colourProblems(measure(SRC, 'dark'), 'dark'));
 }
 
 /* 2. a browser, when there is one */
-const opened = light.error ? null : await openBrowser();
+const opened = light.error && !BROWSER_ONLY ? null : await openBrowser();
+if (BROWSER_ONLY && !opened) { console.error('--browser-only: no browser available'); process.exit(2); }
 let previews = 'none';
 if (opened) {
   const { browser } = opened;
@@ -131,6 +133,7 @@ if (opened) {
       const page = await ctx.newPage();
       await page.goto(pathToFileURL(SVG).href);
       const m = await page.evaluate(MEASURE_IN_PAGE, font);
+      if (m.error === 'not-svg') report([{ level: 'fail', check: 'xml', where: 'file', msg: 'the browser could not read the file as SVG (it shows a parse error page)' }], '(browser)');
       if (!m.error) {
         if (!font && theme === 'light') report(geometryProblems(m), '(browser)');
         if (font) report(geometryProblems(m), '(browser, fallback font Arial)');
@@ -155,7 +158,7 @@ if (outDir && previews === 'none' && dims) {
   const renderer = findRenderer();
   for (const theme of ['light', 'dark']) {
     const flat = join(outDir, `${NAME}.check-${theme}.svg`);
-    writeFileSync(flat, flatten(SRC, theme));
+    writeFileSync(flat, flatten(SRC, theme, { font: BUNDLED_FONT }));
     if (renderer) {
       try { renderPng(renderer, flat, join(outDir, `${NAME}.check-${theme}.png`), 2); } catch (e) { previews = `none: ${e.message}`; }
     }

@@ -6,7 +6,7 @@
  * Anything this reader cannot evaluate (a broken file, a selector or colour it does not
  * understand) is a failure, so a pass here never rests on a guess.
  */
-import { parse, computeStyles, elements, classes, hasClass, closest, textOf, inDefs, color, num, weight, rectBox, textBox, minFontSize, shapeBox, pathPoints, polyLength, pointAt, viewBox } from './svgdom.mjs';
+import { parse, computeStyles, elements, classes, hasClass, closest, textOf, inDefs, color, num, weight, rectBox, textBox, minFontSize, shapeBox, pathPoints, polyLength, pointAt, viewBox, isMonospace } from './svgdom.mjs';
 import { sampleSteps } from './checks.mjs';
 
 export function measure(src, theme) {
@@ -17,9 +17,13 @@ export function measure(src, theme) {
   if (!doc.svg) return { error: 'not-svg', problems: [...problems, { level: 'fail', check: 'not-svg', where: '', msg: 'file is not an SVG document' }] };
   const vb = viewBox(doc.svg);
   if (!vb) return { error: 'viewbox', problems: [...problems, { level: 'fail', check: 'viewbox', where: 'svg', msg: 'no viewBox; set viewBox="0 0 W H"' }] };
-  const { unsupported, unknownProps } = computeStyles(doc, theme);
-  for (const s of unsupported) add('fail', 'css-selector', 'style', `selector "${s}" cannot be checked without a browser; write it with tags, classes, ids, descendant or child (>) combinators`);
+  const { unsupported, unknownProps, valueProblems } = computeStyles(doc, theme);
+  for (const s of unsupported) add('fail', 'css-selector', 'style', s.startsWith('@')
+    ? `"${s}" cannot be evaluated without a browser; move its rules out of it, or use only prefers-color-scheme media queries`
+    : `selector "${s}" cannot be checked without a browser; write it with tags, classes, ids, descendant or child (>) combinators`);
+  for (const v of valueProblems) add('fail', 'css-value', 'style', v);
   for (const p of unknownProps) add('warn', 'css-property', 'style', `property "${p}" is not evaluated by the checker`);
+  const FAMILIES = /^(ui-sans-serif|-apple-system|BlinkMacSystemFont|system-ui|Segoe UI|Roboto|Helvetica Neue|Helvetica|Arial|Liberation Sans|DejaVu Sans|Noto Sans|sans-serif)$/i;
 
   const all = elements(doc.svg).filter((e) => !inDefs(e));
   const label = (el) => textOf(el).trim().replace(/\s+/g, ' ').slice(0, 40);
@@ -65,6 +69,8 @@ export function measure(src, theme) {
 
   const texts = [];
   for (const t of all.filter((e) => e.tag === 'text' && label(e) && !e.hidden)) {
+    const fam = String(t.cs['font-family']).split(',')[0].trim().replace(/["']/g, '');
+    if (!FAMILIES.test(fam) && !isMonospace(t.cs['font-family'])) add('warn', 'font-family', where(t), `"${label(t)}" uses "${fam}", which the width table does not measure; widths are estimated from the sans-serif table`);
     const r = textBox(t);
     const owner = closest(t, isShapeGroup);
     const stroke = t.cs.stroke;

@@ -27,7 +27,7 @@ import { pathToFileURL } from 'node:url';
 import { flatten } from './lib/flatten.mjs';
 import { viewBox, parse } from './lib/svgdom.mjs';
 import { openBrowser } from './lib/browser.mjs';
-import { findRenderer, renderPng, renderPdf, INSTALL_HINT } from './lib/render.mjs';
+import { findRenderer, renderPng, renderPdf, INSTALL_HINT, BUNDLED_FONT } from './lib/render.mjs';
 
 const argv = process.argv.slice(2);
 const opt = (name, dflt) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : dflt);
@@ -102,8 +102,8 @@ if (want('--png') || want('--pdf')) {
     /* No browser: flatten, then hand the file to resvg / rsvg-convert. */
     const tmp = mkdtempSync(join(tmpdir(), 'clean-diagrams-'));
     const flat = { light: join(tmp, `${name}.light.svg`), dark: join(tmp, `${name}.dark.svg`) };
-    writeFileSync(flat.light, flatten(source, 'light'));
-    writeFileSync(flat.dark, flatten(source, 'dark'));
+    writeFileSync(flat.light, flatten(source, 'light', { font: BUNDLED_FONT }));
+    writeFileSync(flat.dark, flatten(source, 'dark', { font: BUNDLED_FONT }));
     if (want('--png')) {
       const r = findRenderer('png');
       if (!r) skipped.push(`PNG: no browser and no renderer; ${INSTALL_HINT}`);

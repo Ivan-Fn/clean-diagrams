@@ -20,17 +20,19 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 /* Browser-only font keywords mean nothing to other renderers; drop them so the list falls
    through to a family the machine has. */
-const portableFonts = (f) => {
+const portableFonts = (f, lead) => {
   const list = f.split(',').map((s) => s.trim()).filter((s) => !/^(ui-sans-serif|-apple-system|BlinkMacSystemFont|system-ui)$/i.test(s.replace(/["']/g, '')));
   /* Fonts most Linux machines have, before the generic family, so a renderer without
      Arial still finds a face instead of drawing no text. */
   const generic = list.findIndex((s) => /^(sans-serif|serif|monospace)$/i.test(s));
   const extra = ['"Liberation Sans"', '"DejaVu Sans"', '"Noto Sans"'].filter((x) => !list.includes(x));
   if (generic >= 0) list.splice(generic, 0, ...extra); else list.push(...extra, 'sans-serif');
+  if (lead) { const q = `"${lead}"`; const i = list.indexOf(q); if (i >= 0) list.splice(i, 1); list.unshift(q); }
   return list.join(', ');
 };
 
-export function flatten(src, theme) {
+/* opts.font: a family to put first, so a renderer given that font draws with it */
+export function flatten(src, theme, opts = {}) {
   const doc = parse(src);
   if (!doc.svg) throw new Error('not an SVG document');
   computeStyles(doc, theme);
@@ -40,12 +42,13 @@ export function flatten(src, theme) {
     const out = [];
     for (const [k, v] of Object.entries(el.attrs)) if (KEEP_ATTRS.has(k) || k.startsWith('data-') || k.startsWith('aria-')) out.push(`${k}="${esc(v)}"`);
     const cs = el.cs || {};
-    const props = el.tag === 'text' || el.tag === 'tspan' ? [...SHAPE, ...TEXT] : DRAWN.has(el.tag) ? [...SHAPE, ...MARKERS] : el.tag === 'g' ? ['opacity'] : [];
+    const props = el.tag === 'text' || el.tag === 'tspan' ? [...SHAPE, ...TEXT] : DRAWN.has(el.tag) ? [...SHAPE, ...MARKERS] : el.tag === 'g' ? ['opacity']
+      : el.tag === 'stop' ? ['stop-color', 'stop-opacity'] : [];
     if (el.hidden && !el.parent?.hidden) out.push('display="none"');
     for (const p of props) {
       let v = cs[p];
       if (v == null || v === '') continue;
-      if (p === 'font-family') v = portableFonts(v);
+      if (p === 'font-family') v = portableFonts(v, opts.font);
       if (p === 'font-size' && /^\d+(\.\d+)?$/.test(v)) v = `${v}px`;
       /* Renderers outside a browser often have no 600 face and fall back to regular;
          bold keeps names visibly heavier than notes everywhere. */
