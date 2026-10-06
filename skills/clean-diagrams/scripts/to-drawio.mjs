@@ -125,6 +125,8 @@ for (const s of ordered) {
   const tl = s.texts, td = d.texts;
   if (tl.length) {
     const first = tl[0], firstD = td[0];
+    /* text written left-aligned (beside an icon) stays left-aligned at the same inset */
+    if (s.kind !== 'group' && first.anchor === 'start') { st.align = 'left'; st.spacingLeft = n(first.x - s.rect.x - 2); }
     st.fontColor = pair(first.color, firstD.color);
     st.fontSize = n(first.size);
     st.fontStyle = first.weight >= 600 ? 1 : 0;
@@ -135,12 +137,6 @@ for (const s of ordered) {
       st.spacingTop = n(first.box.y - s.rect.y - 4);
       if (st.align === 'left') st.spacingLeft = n(first.box.x - s.rect.x - 2);
       value = PLAIN ? tl.map((t) => t.s).join('\n') : [html(first.s), ...tl.slice(1).map((t) => `<span style="font-weight:normal;opacity:0.75">${html(t.s)}</span>`)].join('<br>');
-    } else {
-      /* text written left-aligned (beside an icon) stays left-aligned at the same inset */
-      if (first.anchor === 'start') { st.align = 'left'; st.spacingLeft = n(first.x - s.rect.x - 2); }
-    }
-    if (s.kind === 'group') {
-      /* handled above */
     } else if (PLAIN) {
       value = tl.map((t) => t.s).join('\n');
     } else {

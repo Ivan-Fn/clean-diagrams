@@ -78,6 +78,8 @@ export function measure(src, theme) {
   }
   const blend = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
   const within = (p, r) => p.x > r.x && p.x < r.r && p.y > r.y && p.y < r.b;
+  /* the colour under a point, shared by text and icon contrast */
+  const backgroundAt = (c) => { let bg = { r: 255, g: 255, b: 255, a: 1 }; for (const p of painted) if (within(c, p.box)) bg = blend(p.fill, bg); return bg; };
 
   const texts = [];
   for (const t of all.filter((e) => e.tag === 'text' && label(e) && !e.hidden)) {
@@ -88,9 +90,7 @@ export function measure(src, theme) {
     const stroke = t.cs.stroke;
     const fgRaw = color(t.cs.fill);
     if (fgRaw === undefined) add('fail', 'colour-value', where(t), `fill "${t.cs.fill}" is not a colour the checker can read`);
-    const c = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
-    let bg = { r: 255, g: 255, b: 255, a: 1 };
-    for (const p of painted) if (within(c, p.box)) bg = blend(p.fill, bg);
+    const bg = backgroundAt({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
     texts.push({
       label: label(t), where: where(t), owner: owner?.attrs.id ?? null, r,
       size: minFontSize(t), weight: weight(t.cs['font-weight']),
@@ -108,9 +108,7 @@ export function measure(src, theme) {
     const r = { x, y, w, h, r: x + w, b: y + h };
     const owner = closest(u, isShapeGroup);
     const fgRaw = color(u.cs.color);
-    const c = { x: x + w / 2, y: y + h / 2 };
-    let bg = { r: 255, g: 255, b: 255, a: 1 };
-    for (const p of painted) if (within(c, p.box)) bg = blend(p.fill, bg);
+    const bg = backgroundAt({ x: x + w / 2, y: y + h / 2 });
     icons.push({ href, ok: symbols.has(href), sized: w > 0 && h > 0, label: href.replace(/^icon-/, ''), where: owner?.attrs.id ? `#${owner.attrs.id}` : `icon ${href}`,
       owner: owner?.attrs.id ?? null, r, fg: fgRaw ? { ...fgRaw, a: fgRaw.a * u.op } : null, bg });
   }

@@ -71,10 +71,9 @@ const MEASURE_IN_PAGE = (fallbackFont) => {
   /* opacity multiplies down the tree; getComputedStyle reports only the element's own */
   const op = (el) => { let o = 1; for (let p = el; p && p !== svg.parentNode; p = p.parentNode) if (p.nodeType === 1) o *= parseFloat(getComputedStyle(p).opacity); return o; };
   const visible = (el) => !el.checkVisibility || el.checkVisibility({ visibilityProperty: true });
-  const texts = [...svg.querySelectorAll('text')].filter((t) => !t.closest('defs, marker') && label(t) && visible(t)).map((t) => {
-    const cs = getComputedStyle(t), r = box(t.getBBox());
-    const size = Math.min(parseFloat(cs.fontSize), ...[...t.querySelectorAll('tspan')].map((s) => parseFloat(getComputedStyle(s).fontSize)));
-    const c = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+  /* the colour under a point: every painted shape below it, blended in document order. One
+     helper for text and icon contrast, so the two checks cannot drift apart. */
+  const backgroundAt = (c) => {
     let bg = { r: 255, g: 255, b: 255, a: 1 };
     for (const el of painted) {
       const ps = getComputedStyle(el), fill = rgba(ps.fill);
@@ -84,6 +83,13 @@ const MEASURE_IN_PAGE = (fallbackFont) => {
       if (el.tagName !== 'rect' && !(el.isPointInFill && el.isPointInFill(Object.assign(svg.createSVGPoint(), c)))) continue;
       bg = blend({ ...fill, a: fill.a * parseFloat(ps.fillOpacity) * op(el) }, bg);
     }
+    return bg;
+  };
+  const texts = [...svg.querySelectorAll('text')].filter((t) => !t.closest('defs, marker') && label(t) && visible(t)).map((t) => {
+    const cs = getComputedStyle(t), r = box(t.getBBox());
+    const size = Math.min(parseFloat(cs.fontSize), ...[...t.querySelectorAll('tspan')].map((s) => parseFloat(getComputedStyle(s).fontSize)));
+    const c = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+    const bg = backgroundAt(c);
     const fg = rgba(cs.fill);
     const own = t.closest('g.node, g.group');
     return { label: label(t), where: where(t), owner: own && own.id ? own.id : null, r, size, weight: parseInt(cs.fontWeight, 10),
@@ -102,15 +108,7 @@ const MEASURE_IN_PAGE = (fallbackFont) => {
     const x = u.x.baseVal.value, y = u.y.baseVal.value, w = u.width.baseVal.value, h = u.height.baseVal.value;
     const r = { x, y, w, h, r: x + w, b: y + h };
     const c = { x: x + w / 2, y: y + h / 2 };
-    let bg = { r: 255, g: 255, b: 255, a: 1 };
-    for (const el of painted) {
-      const ps = getComputedStyle(el), fill = rgba(ps.fill);
-      if (!fill || fill.a === 0) continue;
-      const bb = box(el.getBBox());
-      if (!(c.x > bb.x && c.x < bb.r && c.y > bb.y && c.y < bb.b)) continue;
-      if (el.tagName !== 'rect' && !(el.isPointInFill && el.isPointInFill(Object.assign(svg.createSVGPoint(), c)))) continue;
-      bg = blend({ ...fill, a: fill.a * parseFloat(ps.fillOpacity) * op(el) }, bg);
-    }
+    const bg = backgroundAt(c);
     const fg = rgba(getComputedStyle(u).color);
     const own = u.closest('g.node, g.group');
     return { href, ok: !!(href && svg.querySelector(`symbol[id="${href}"]`)), sized: w > 0 && h > 0, label: href.replace(/^icon-/, ''),
@@ -155,6 +153,7 @@ if (opened) {
       await page.goto(pathToFileURL(SVG).href);
       const m = await page.evaluate(MEASURE_IN_PAGE, font);
       if (m.error === 'not-svg') report([{ level: 'fail', check: 'xml', where: 'file', msg: 'the browser could not read the file as SVG (it shows a parse error page)' }], '(browser)');
+      if (m.error === 'viewbox') report([{ level: 'fail', check: 'viewbox', where: 'svg', msg: 'no viewBox; set viewBox="0 0 W H"' }], '(browser)');
       if (!m.error) {
         if (!font && theme === 'light') report(geometryProblems(m), '(browser)');
         if (font) report(geometryProblems(m), '(browser, fallback font Arial)');
@@ -166,8 +165,8 @@ if (opened) {
         if (size) {
           await page.setViewportSize({ width: Math.ceil(size.W), height: Math.ceil(size.H) });
           await page.screenshot({ path: join(outDir, `${NAME}.check-${theme}.png`), clip: { x: 0, y: 0, width: size.W, height: size.H } });
+          previews = opened.kind;
         }
-        previews = opened.kind;
       }
       await ctx.close();
     }

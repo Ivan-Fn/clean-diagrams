@@ -122,7 +122,11 @@ const drawio = (xml) => {
   /* an image cell inside a box is that box's icon, not a box of its own */
   const isIcon = (c) => c.st.shape === 'image' || c.st.image != null;
   const iconOf = new Map(vertices.filter(isIcon).map((c) => [c.parent, c]));
-  const groups = vertices.filter((c) => !onEdge(c) && !isIcon(c) && isContainer(c) && !isText(c) && !(vertices.every((v) => v.parent !== c.id || isIcon(v))));
+  /* a container is a cell marked as one, or one that holds boxes; an icon alone does not
+     make its box a container */
+  const marked = (c) => c.st.container === '1' || c.st.swimlane === true || c.st.shape === 'swimlane' || c.st.group === true;
+  const holdsBoxes = (c) => vertices.some((v) => v.parent === c.id && !isIcon(v));
+  const groups = vertices.filter((c) => !onEdge(c) && !isIcon(c) && !isText(c) && (marked(c) || holdsBoxes(c)));
   const boxes = vertices.filter((c) => !onEdge(c) && !isIcon(c) && !groups.includes(c) && !isText(c));
   const texts = vertices.filter((c) => !onEdge(c) && isText(c));
   const inside = (o, i) => i.x >= o.x && i.y >= o.y && i.x + i.w <= o.x + o.w && i.y + i.h <= o.y + o.h;
