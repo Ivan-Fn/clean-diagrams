@@ -36,9 +36,19 @@ export function flatten(src, theme, opts = {}) {
   const doc = parse(src);
   if (!doc.svg) throw new Error('not an SVG document');
   computeStyles(doc, theme);
+  const verbatim = (el) => (el.tag === '#text' ? esc(el.text)
+    : `<${el.rawTag || el.tag}${Object.entries(el.attrs).map(([k, v]) => ` ${k}="${esc(v)}"`).join('')}${el.children.length ? `>${el.children.map(verbatim).join('')}</${el.rawTag || el.tag}>` : '/>'}`);
   const write = (el) => {
     if (el.tag === '#text') return esc(el.text);
     if (el.tag === 'style') return '';
+    /* an icon's drawing uses currentColor, which the <use> supplies: keep it as written */
+    if (el.tag === 'symbol') return verbatim(el);
+    if (el.tag === 'use' && el.cs) {
+      const keep = Object.entries(el.attrs).filter(([k]) => k !== 'style').map(([k, v]) => ` ${k}="${esc(v)}"`).join('');
+      const c = el.cs.color && el.cs.color !== 'currentColor' ? ` color="${esc(el.cs.color)}"` : '';
+      const o = Number(el.cs.opacity) !== 1 && el.cs.opacity != null ? ` opacity="${esc(el.cs.opacity)}"` : '';
+      return `<use${keep}${c}${o}/>`;
+    }
     const out = [];
     for (const [k, v] of Object.entries(el.attrs)) if (KEEP_ATTRS.has(k) || k.startsWith('xmlns') || k.startsWith('data-') || k.startsWith('aria-')) out.push(`${k}="${esc(v)}"`);
     const cs = el.cs || {};

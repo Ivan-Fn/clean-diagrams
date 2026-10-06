@@ -14,6 +14,7 @@ architecture and process figures; the others below are built from the same parts
 | Where a trust or network boundary falls | flow or hub inside dashed containers | `flow.svg` + `group dashed` |
 | Layers stacked on each other | groups, one container per row, full width | `groups.svg`, with the containers stacked as full-width rows |
 | Messages between parties in time order | sequence | `sequence.svg` |
+| Which provider or site each part runs in | boundaries: one container per place, with icons | `boundaries.svg` |
 | Two options side by side | two small flows at the same scale, the difference in the accent | `flow.svg` twice |
 
 How much each box says depends on the question. Someone asking how a system works needs a
@@ -55,6 +56,21 @@ The unchanged path on the top row. The approved part ends in a `good` box with a
 arrow. The new path leaves the row with a `bad dashed` arrow labelled with what changed
 and leads to `bad` boxes. A legend under the title names both colours. A count of what is
 now outside the approval goes in a `label bad strong` under the new path.
+
+## Boundaries
+
+One container per place the work runs: on premises, each cloud account or project, a
+SaaS vendor. Three containers of 216 with gaps of 32 fill the canvas; each holds boxes of
+184 in a column. The container's icon and name sit in its top-left corner, and each box
+has a type icon on its left (see Icons in style.md). Arrows that cross a boundary are the
+point of the picture: label them with the protocol or the control (`mTLS`, `VPN`,
+`private link`) and put the accent on the one the title is about. A label in a 32-unit gap
+between containers holds about 4 characters; for longer labels widen the gap.
+
+A 184-wide box with an icon holds a name of about 14 characters. For longer names, stack
+the containers as full-width rows instead of columns, or shorten the names. A part whose
+location the source does not state goes outside every container, between the two it
+connects; say so in your reply instead of guessing a place.
 
 ## Sequence of messages between parties
 

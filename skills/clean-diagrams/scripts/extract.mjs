@@ -119,8 +119,11 @@ const drawio = (xml) => {
   const name = (c) => stripHtml(c.value) || '(no label)';
   /* a vertex whose parent is an arrow is that arrow's label, never a box */
   const onEdge = (c) => byId.get(c.parent)?.edge === '1' || c.st.edgeLabel === true;
-  const groups = vertices.filter((c) => !onEdge(c) && isContainer(c) && !isText(c));
-  const boxes = vertices.filter((c) => !onEdge(c) && !isContainer(c) && !isText(c));
+  /* an image cell inside a box is that box's icon, not a box of its own */
+  const isIcon = (c) => c.st.shape === 'image' || c.st.image != null;
+  const iconOf = new Map(vertices.filter(isIcon).map((c) => [c.parent, c]));
+  const groups = vertices.filter((c) => !onEdge(c) && !isIcon(c) && isContainer(c) && !isText(c) && !(vertices.every((v) => v.parent !== c.id || isIcon(v))));
+  const boxes = vertices.filter((c) => !onEdge(c) && !isIcon(c) && !groups.includes(c) && !isText(c));
   const texts = vertices.filter((c) => !onEdge(c) && isText(c));
   const inside = (o, i) => i.x >= o.x && i.y >= o.y && i.x + i.w <= o.x + o.w && i.y + i.h <= o.y + o.h;
 
@@ -134,7 +137,7 @@ const drawio = (xml) => {
   out('\nboxes:');
   for (const b of [...boxes].sort((p, q) => abs(p).y - abs(q).y || abs(p).x - abs(q).x)) {
     const a = abs(b);
-    out(`  ${b.id}  "${name(b)}"  at ${a.x},${a.y} ${a.w}x${a.h}  ${shapeName(b)}${colours(b) ? `, ${colours(b)}` : ''}`);
+    out(`  ${b.id}  "${name(b)}"  at ${a.x},${a.y} ${a.w}x${a.h}  ${shapeName(b)}${colours(b) ? `, ${colours(b)}` : ''}${iconOf.has(b.id) ? ', has an icon' : ''}`);
   }
   if (edges.length) out('\narrows:');
   const edgeLabels = new Map();

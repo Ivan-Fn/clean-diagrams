@@ -13,7 +13,7 @@ Read the source directly; no script is needed.
 | `graph LR` / `flowchart LR` | flow left to right |
 | `graph TD` / `flowchart TB` | rows top to bottom; consider turning a long thin chain into a row |
 | `A[Text]`, `A(Text)` | box with a name |
-| `A[(Text)]` | box; add the note "database" if the name does not say it |
+| `A[(Text)]` | box; add the note "database" if the name does not say it, or the `database` icon when the diagram uses icons |
 | `A{Text}` | decision: a box with a question as its name and labelled arrows for each outcome |
 | `A([Text])` (stadium), `A[[Text]]` (subroutine), `A{{Text}}`, `A[/Text/]`, `A((Text))`, `A>Text]` | box; keep a kind that matters as a note ("external user", "queue") |
 | `subgraph X [Title] … end` | container named Title, holding its nodes |
@@ -41,7 +41,8 @@ several lines show them separated by ` / `; the first part is usually the name.
   which column is which. Rebuild the coordinates from the sizes in style.md.
 - Source colours are not carried over. Decide the accent and status colours from meaning.
 - Shapes such as cylinders, clouds and actors become boxes; put the kind in the note when
-  it matters ("database", "external user").
+  it matters ("database", "external user"), or give every box an icon (style.md, Icons).
+  A draw.io image inside a box is listed as "has an icon".
 - A draw.io PNG without the embedded diagram has nothing to extract; ask for the
   `.drawio` file, or redraw from the picture by reading it.
 
