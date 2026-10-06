@@ -234,6 +234,24 @@ if (HAVE_BROWSER) {
   writeFileSync(f, tplB.replace('#icon-shield"', '#icon-sheild"'));
   const r3 = run('icons.mjs', [f]);
   result(r3.code === 1 && /unknown icon "sheild"; similar: .*shield/.test(r3.out), 'icons.mjs rejects an unknown icon and suggests a name', r3.out.trim().split('\n')[0]);
+  /* the search reads the style.md table itself: every row resolves, every icon exists, and
+     no extra word in icons.mjs contradicts the table */
+  const md = readFileSync(join(HERE, '..', 'references', 'style.md'), 'utf8');
+  const section = md.split(/^## /m).find((x) => x.startsWith('Icons')) || '';
+  const rows = [...section.matchAll(/^\|\s*([^|`]+?)\s*\|\s*`([a-z0-9-]+)`\s*\|\s*$/gm)];
+  const concepts = JSON.parse(run('icons.mjs', ['--concepts']).out);
+  const byWord = new Map(concepts.map((c) => [c.word, c]));
+  const missing = [];
+  for (const [, things, icon] of rows) for (const k of things.split(',').map((x) => x.replace(/\(.*?\)/g, '').trim().toLowerCase()).filter(Boolean)) {
+    const c = byWord.get(k);
+    if (!c || c.icon !== icon || c.from !== 'style.md') missing.push(`${k}→${icon}`);
+  }
+  result(rows.length >= 40 && missing.length === 0, `icon search uses every row of the style.md table (${rows.length} rows)`, missing.join(', '));
+  const unknownIcons = concepts.filter((c) => !c.known).map((c) => `${c.word}→${c.icon}`);
+  const conflicts = concepts.filter((c) => c.conflict).map((c) => `${c.word}: table ${c.icon}, icons.mjs ${c.conflict}`);
+  result(unknownIcons.length === 0 && conflicts.length === 0, 'every concept word maps to a real icon, with no table conflict', [...unknownIcons, ...conflicts].join('; '));
+  const pki = ['certificate', 'certificate authority', 'trust', 'root of trust', 'trust bundle'].map((w) => [w, run('icons.mjs', ['--search', ...w.split(' ')]).out.split('\n')[0].split(/\s+/)[0]]);
+  result(pki.every(([, i]) => ['badge', 'shield-check', 'package'].includes(i)), 'certificate and trust words find an icon', pki.map(([w, i]) => `${w}→${i}`).join(', '));
   const s = run('icons.mjs', ['--search', 'database']);
   result(s.code === 0 && /^database\s/m.test(s.out), 'icons.mjs --search finds an icon by name');
   const fb = join(WORK, 'boundaries.svg');

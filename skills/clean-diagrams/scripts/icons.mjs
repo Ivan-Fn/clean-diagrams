@@ -4,6 +4,7 @@
  *
  *   node icons.mjs <diagram.svg>        add a <symbol> for every icon the file uses, remove unused ones
  *   node icons.mjs --search <words…>    list icons whose name or tags match all the words
+ *   node icons.mjs --concepts           print the word-to-icon map the search uses, as JSON
  *
  * In the diagram, an icon is
  *   <use class="icon" href="#icon-database" x="38" y="80" width="18" height="18"/>
@@ -24,29 +25,42 @@ import { parseArgs, requireFile } from './lib/args.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ICONS = JSON.parse(readFileSync(join(HERE, 'icons', 'lucide.json'), 'utf8'));
 const TAGS = JSON.parse(readFileSync(join(HERE, 'icons', 'lucide-tags.json'), 'utf8'));
-const USAGE = 'node icons.mjs <diagram.svg>   |   node icons.mjs --search <words…>';
-/* Architecture words Lucide's own tags do not cover; the same map as the table in style.md. */
-const CONCEPTS = {
-  'on premises': 'building', 'on-premises': 'building', 'data centre': 'building', 'data center': 'building', datacenter: 'building', office: 'building',
-  cloud: 'cloud', account: 'cloud', project: 'cloud', subscription: 'cloud', aws: 'cloud', gcp: 'cloud', azure: 'cloud',
-  kubernetes: 'ship-wheel', k8s: 'ship-wheel', cluster: 'ship-wheel', region: 'map-pin', zone: 'map-pin', internet: 'globe', external: 'globe', saas: 'globe',
-  network: 'network', vpc: 'network', vnet: 'network', server: 'server', vm: 'server', 'virtual machine': 'server', host: 'server',
-  container: 'container', pod: 'container', docker: 'container', function: 'square-function', serverless: 'square-function', lambda: 'square-function',
-  service: 'box', microservice: 'box', api: 'braces', 'web app': 'app-window', frontend: 'app-window', website: 'app-window', mobile: 'smartphone',
-  user: 'user', person: 'user', customer: 'user', analyst: 'user', analysts: 'users', team: 'users', group: 'users',
-  database: 'database', db: 'database', sql: 'database', postgres: 'database', oracle: 'database', mysql: 'database', dynamodb: 'database', table: 'database',
-  cache: 'database-zap', redis: 'database-zap', warehouse: 'warehouse', bigquery: 'warehouse', snowflake: 'warehouse', redshift: 'warehouse', lake: 'warehouse',
-  'object storage': 'archive', bucket: 'archive', s3: 'archive', storage: 'archive', files: 'archive', disk: 'hard-drive', volume: 'hard-drive',
-  queue: 'inbox', sqs: 'inbox', 'message queue': 'inbox', stream: 'radio-tower', kafka: 'radio-tower', 'pub/sub': 'radio-tower', pubsub: 'radio-tower', events: 'radio-tower', 'event bus': 'radio-tower',
-  gateway: 'shield', firewall: 'shield', policy: 'shield', security: 'shield', fraud: 'shield', 'load balancer': 'split', balancer: 'split', proxy: 'split',
-  identity: 'key-round', idp: 'key-round', auth: 'key-round', sso: 'key-round', secrets: 'lock-keyhole', vault: 'lock-keyhole',
-  scheduler: 'clock', cron: 'clock', batch: 'cog', job: 'cog', worker: 'cog', agent: 'bot', 'ai agent': 'bot', model: 'brain', llm: 'brain', ml: 'brain',
-  pipeline: 'workflow', 'ci/cd': 'workflow', ci: 'workflow', repository: 'git-branch', repo: 'git-branch', git: 'git-branch',
-  dashboard: 'layout-dashboard', looker: 'layout-dashboard', grafana: 'layout-dashboard', metrics: 'activity', monitoring: 'activity', logs: 'scroll-text', alerts: 'bell',
-  email: 'mail', chat: 'message-square', document: 'file-text', payments: 'credit-card', bank: 'landmark', 'core banking': 'landmark', integration: 'plug', plugin: 'plug',
+const USAGE = 'node icons.mjs <diagram.svg>   |   node icons.mjs --search <words…>   |   node icons.mjs --concepts';
+/* Architecture words Lucide's own tags do not cover. The table under "Icons" in
+   references/style.md is the source: it is read here at run time, so the docs and the search
+   cannot disagree. EXTRA adds only words the table does not list (product names, short
+   forms); where a word is in both, the table wins, and test.mjs fails if they differ. */
+const EXTRA = {
+  aws: 'cloud', gcp: 'cloud', azure: 'cloud', account: 'cloud', project: 'cloud', 'on-premises': 'building', datacenter: 'building', 'data center': 'building',
+  kubernetes: 'ship-wheel', k8s: 'ship-wheel', cluster: 'ship-wheel', vnet: 'network', vm: 'server', host: 'server', docker: 'container', lambda: 'square-function',
+  microservice: 'box', frontend: 'app-window', website: 'app-window', mobile: 'smartphone', customer: 'user', analyst: 'user', analysts: 'users',
+  db: 'database', sql: 'database', postgres: 'database', oracle: 'database', mysql: 'database', dynamodb: 'database', table: 'database',
+  redis: 'database-zap', bigquery: 'warehouse', snowflake: 'warehouse', redshift: 'warehouse', lake: 'warehouse', bucket: 'archive', s3: 'archive', storage: 'archive',
+  sqs: 'inbox', stream: 'radio-tower', kafka: 'radio-tower', pubsub: 'radio-tower', events: 'radio-tower', 'event bus': 'radio-tower',
+  security: 'shield', fraud: 'shield', balancer: 'split', proxy: 'split', idp: 'key-round', auth: 'key-round', sso: 'key-round', identity: 'key-round',
+  batch: 'cog', job: 'cog', agent: 'bot', llm: 'brain', ml: 'brain', ci: 'workflow', repo: 'git-branch', git: 'git-branch',
+  looker: 'layout-dashboard', grafana: 'layout-dashboard', monitoring: 'activity', bank: 'landmark', plugin: 'plug', certs: 'badge', pki: 'shield-check', trust: 'shield-check', tls: 'badge', mtls: 'badge',
 };
+export function conceptTable() {
+  const out = new Map();
+  let md = '';
+  try { md = readFileSync(join(HERE, '..', 'references', 'style.md'), 'utf8'); } catch { return out; }
+  const section = md.split(/^## /m).find((s) => s.startsWith('Icons')) || '';
+  for (const m of section.matchAll(/^\|\s*([^|`]+?)\s*\|\s*`([a-z0-9-]+)`\s*\|\s*$/gm)) {
+    for (const k of m[1].split(',').map((x) => x.replace(/\(.*?\)/g, '').trim().toLowerCase()).filter(Boolean)) out.set(k, m[2]);
+  }
+  return out;
+}
+const TABLE = conceptTable();
+const CONCEPTS = { ...EXTRA, ...Object.fromEntries(TABLE) };
 
 const argv = process.argv.slice(2);
+if (argv[0] === '--concepts') {
+  const rows = Object.keys(CONCEPTS).sort().map((k) => ({ word: k, icon: CONCEPTS[k], from: TABLE.has(k) ? 'style.md' : 'icons.mjs', known: !!ICONS[CONCEPTS[k]],
+    conflict: TABLE.has(k) && EXTRA[k] && EXTRA[k] !== TABLE.get(k) ? EXTRA[k] : undefined }));
+  console.log(JSON.stringify(rows));
+  process.exit(0);
+}
 if (argv[0] === '--search') {
   const words = argv.slice(1).map((w) => w.toLowerCase());
   if (!words.length) { console.error(`usage: ${USAGE}`); process.exit(2); }

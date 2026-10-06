@@ -170,9 +170,10 @@ icon used into `<defs>` and removes unused ones:
 </g>
 ```
 
-Find an icon with `node scripts/icons.mjs --search <word>` (1,866 Lucide icons); it
-checks the table below first, so architecture words such as "kubernetes", "gateway" or
-"data centre" find the icon listed here. The usual ones:
+Find an icon with `node scripts/icons.mjs --search <word>` (1,866 Lucide icons). The
+search reads the table below first, so an architecture word such as "gateway", "data
+centre" or "certificate" finds the icon listed here; to change what a word finds, edit
+this table. The usual ones:
 
 | Thing | Icon |
 |---|---|
@@ -202,6 +203,9 @@ checks the table below first, so architecture words such as "kubernetes", "gatew
 | load balancer | `split` |
 | identity provider, keys | `key-round` |
 | secrets, vault | `lock-keyhole` |
+| certificate, cert | `badge` |
+| certificate authority, CA, root of trust | `shield-check` |
+| trust bundle | `package` |
 | scheduler, cron | `clock` |
 | worker, batch job | `cog` |
 | AI agent | `bot` |

@@ -2,6 +2,9 @@
 name: clean-diagrams
 description: Draws clean architecture and flow diagrams as standalone SVG files (flat boxes, thin grey borders, one accent colour, labelled arrows, automatic light and dark themes), checks them for layout defects with Node alone (no browser needed), and exports PNG, PDF and editable draw.io files. Also redraws an existing Mermaid, draw.io or Excalidraw diagram in this style. Use when asked for an architecture, system, flow, data-flow, pipeline, before-and-after or comparison diagram, a diagram for a README, docs page, slide deck or paper, or to make an existing diagram look better.
 license: MIT
+metadata:
+  source: https://github.com/Ivan-Fn/clean-diagrams
+  version: 0.3.0
 ---
 
 # Clean diagrams
@@ -118,3 +121,7 @@ user marks as important. Tell the user anything you merged, renamed or dropped.
 | `scripts/to-drawio.mjs` | SVG to an editable `.drawio` file, optionally exported by draw.io |
 | `scripts/extract.mjs` | Outline of a draw.io or Excalidraw file, for redrawing |
 | `scripts/test.mjs` | Proves the templates pass and that each check catches its defect |
+
+Source, updates and issues: https://github.com/Ivan-Fn/clean-diagrams (version 0.3.0).
+If you copy this skill into another repository, keep this line so feedback can find its way
+back.
