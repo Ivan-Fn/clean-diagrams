@@ -16,11 +16,10 @@
  *                   instead of HTML inside the SVG, which some non-browser tools need, but
  *                   a box's name and note share one font size.
  */
-import { chromium } from 'playwright';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { parse, computeStyles, elements, hasClass, closest, textOf, inDefs, color, hex, num, weight, rectBox, textBox, pathPoints, polyLength, pointAt, viewBox } from './lib/svgdom.mjs';
 
 const argv = process.argv.slice(2);
 const pos = argv.filter((a) => !a.startsWith('--'));
@@ -31,61 +30,42 @@ if (!pos[0] || !existsSync(pos[0])) {
 const SVG = resolve(pos[0]);
 const OUT = resolve(pos[1] || join(dirname(SVG), `${basename(SVG, '.svg')}.drawio`));
 const PLAIN = argv.includes('--plain-labels');
+const SRC = readFileSync(SVG, 'utf8');
 
-/* Runs in the page, once per theme. Colours come back resolved for that theme. */
-const READ = () => {
-  const svg = document.documentElement;
-  const vb = svg.viewBox.baseVal;
-  const hex = (c) => {
-    const m = c && c.match(/rgba?\(([^)]+)\)/);
-    if (!m) return 'none';
-    const [r, g, b, a = 1] = m[1].split(/[ ,/]+/).filter(Boolean).map(Number);
-    if (a === 0) return 'none';
-    return `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
-  };
-  const bb = (el) => { const b = el.getBBox(); return { x: b.x, y: b.y, w: b.width, h: b.height }; };
-  const paint = (el) => {
-    const cs = getComputedStyle(el);
-    return { fill: hex(cs.fill), stroke: cs.stroke === 'none' ? 'none' : hex(cs.stroke), sw: parseFloat(cs.strokeWidth) || 0,
-      dash: cs.strokeDasharray && cs.strokeDasharray !== 'none' ? cs.strokeDasharray.replace(/px/g, '').replace(/,\s*/g, ' ') : '' };
-  };
-  const txt = (t) => {
-    const cs = getComputedStyle(t);
-    return { s: t.textContent.trim().replace(/\s+/g, ' '), size: parseFloat(cs.fontSize), weight: parseInt(cs.fontWeight, 10),
-      color: hex(cs.fill), anchor: cs.textAnchor, box: bb(t), x: t.x.baseVal[0]?.value ?? 0, y: t.y.baseVal[0]?.value ?? 0,
-      cls: t.getAttribute('class') || '' };
-  };
-  const shapes = [...svg.querySelectorAll('g.node, g.group')].map((g) => {
-    const rect = g.querySelector(':scope > rect');
-    return { id: g.id, kind: g.classList.contains('node') ? 'node' : 'group', rect: bb(rect), rx: Number(rect.getAttribute('rx') || 0),
-      paint: paint(rect), texts: [...g.querySelectorAll('text')].map(txt) };
+/* Read the diagram for one theme without a browser: geometry from the attributes, colours
+   from the file's own stylesheet, text extents from the measured width table. */
+const read = (theme) => {
+  const doc = parse(SRC);
+  computeStyles(doc, theme);
+  const vb = viewBox(doc.svg);
+  const all = elements(doc.svg).filter((e) => !inDefs(e));
+  const isShape = (e) => e.tag === 'g' && (hasClass(e, 'node') || hasClass(e, 'group'));
+  const toHex = (v) => { const c = color(v); return c && c.a > 0 ? hex(c) : 'none'; };
+  const bb = (r) => ({ x: r.x, y: r.y, w: r.w, h: r.h });
+  const paint = (el) => ({ fill: toHex(el.cs.fill), stroke: toHex(el.cs.stroke), sw: num(el.cs['stroke-width'], 1),
+    dash: el.cs['stroke-dasharray'] && el.cs['stroke-dasharray'] !== 'none' ? el.cs['stroke-dasharray'].replace(/px/g, '').replace(/,\s*/g, ' ').trim() : '' });
+  const txt = (t) => ({ s: textOf(t).trim().replace(/\s+/g, ' '), size: num(t.cs['font-size'], 16), weight: weight(t.cs['font-weight']),
+    color: toHex(t.cs.fill), anchor: t.cs['text-anchor'], box: bb(textBox(t)), x: num(t.attrs.x), y: num(t.attrs.y), cls: t.attrs.class || '' });
+  for (const g of all.filter(isShape)) if (!g.attrs.id || !g.children.some((c) => c.tag === 'rect')) console.error(`to-drawio: skipped a ${hasClass(g, 'node') ? 'box' : 'container'} ${g.attrs.id ? `#${g.attrs.id}` : 'without an id'}: it needs an id and a <rect>. Run check.mjs first.`);
+  const shapes = all.filter(isShape).filter((g) => g.attrs.id && g.children.some((c) => c.tag === 'rect')).map((g) => {
+    const rect = g.children.find((c) => c.tag === 'rect');
+    return { id: g.attrs.id, kind: hasClass(g, 'node') ? 'node' : 'group', rect: bb(rectBox(rect)), rx: num(rect.attrs.rx),
+      paint: paint(rect), texts: elements(g).filter((e) => e.tag === 'text' && textOf(e).trim()).map(txt) };
   });
-  const owned = new Set([...svg.querySelectorAll('g.node text, g.group text')]);
-  const edges = [...svg.querySelectorAll('path.edge')].map((p) => {
-    const len = p.getTotalLength(), mid = p.getPointAtLength(len / 2);
-    return { id: p.id, from: p.dataset.from, to: p.dataset.to, d: p.getAttribute('d'), paint: paint(p), mid: { x: mid.x, y: mid.y },
-      head: !!p.getAttribute('marker-end'), samples: Array.from({ length: Math.max(2, Math.ceil(len / 4)) }, (_, i) => { const q = p.getPointAtLength((len * i) / Math.max(1, Math.ceil(len / 4) - 1)); return { x: q.x, y: q.y }; }) };
+  const edges = all.filter((e) => e.tag === 'path' && hasClass(e, 'edge')).map((p, i) => {
+    let pts;
+    try { pts = pathPoints(p.attrs.d || ''); } catch (err) { throw new Error(`arrow ${p.attrs.id || i + 1}: ${err.message}. Run check.mjs first.`); }
+    const len = polyLength(pts), n = Math.max(2, Math.ceil(len / 4));
+    return { id: p.attrs.id || `edge-${i + 1}`, from: p.attrs['data-from'], to: p.attrs['data-to'], d: p.attrs.d, paint: paint(p), mid: pointAt(pts, len / 2),
+      head: !!(p.attrs['marker-end'] || (p.cs['marker-end'] && p.cs['marker-end'] !== 'none')), samples: Array.from({ length: n }, (_, i) => pointAt(pts, (len * i) / (n - 1))) };
   });
-  const free = [...svg.querySelectorAll('text')].filter((t) => !owned.has(t) && !t.closest('defs, marker') && t.textContent.trim()).map(txt);
-  const loose = [...svg.querySelectorAll('rect')].filter((r) => !r.closest('g.node, g.group, defs, marker') && !r.classList.contains('bg'))
-    .map((r) => ({ rect: bb(r), rx: Number(r.getAttribute('rx') || 0), paint: paint(r) }));
-  const title = svg.querySelector('text.title');
-  return { W: vb.width, H: vb.height, shapes, edges, free, loose, title: title ? title.textContent.trim() : '' };
+  const free = all.filter((t) => t.tag === 'text' && textOf(t).trim() && !closest(t, isShape)).map(txt);
+  const loose = all.filter((r) => r.tag === 'rect' && !closest(r, isShape) && !hasClass(r, 'bg')).map((r) => ({ rect: bb(rectBox(r)), rx: num(r.attrs.rx), paint: paint(r) }));
+  const title = all.find((e) => e.tag === 'text' && hasClass(e, 'title'));
+  return { W: vb.w, H: vb.h, shapes, edges, free, loose, title: title ? textOf(title).trim() : '' };
 };
-
-const browser = await chromium.launch();
-const model = {};
-try {
-  for (const theme of ['light', 'dark']) {
-    const ctx = await browser.newContext({ colorScheme: theme });
-    const page = await ctx.newPage();
-    await page.goto(pathToFileURL(SVG).href);
-    model[theme] = await page.evaluate(READ);
-    await ctx.close();
-  }
-} finally {
-  await browser.close();
-}
+let model;
+try { model = { light: read('light'), dark: read('dark') }; } catch (e) { console.error(`to-drawio: ${e.message}`); process.exit(1); }
 const L = model.light, D = model.dark;
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -181,26 +161,6 @@ L.free.forEach((t, i) => {
 });
 
 /* edges */
-const pathPoints = (d) => {
-  const toks = d.match(/[MLHVmlhv]|-?\d*\.?\d+(?:e-?\d+)?/g) || [];
-  const pts = [];
-  let cmd = null, x = 0, y = 0;
-  for (let i = 0; i < toks.length;) {
-    if (/[MLHVmlhv]/.test(toks[i])) cmd = toks[i++];
-    const num = () => Number(toks[i++]);
-    switch (cmd) {
-      case 'M': case 'L': x = num(); y = num(); break;
-      case 'm': case 'l': x += num(); y += num(); break;
-      case 'H': x = num(); break;
-      case 'h': x += num(); break;
-      case 'V': y = num(); break;
-      case 'v': y += num(); break;
-      default: throw new Error(`unsupported path command "${cmd}" in "${d}" — use M, L, H and V only`);
-    }
-    pts.push({ x, y });
-  }
-  return pts;
-};
 const rectOf = (id) => L.shapes.find((s) => s.id === id)?.rect;
 for (const e of L.edges) {
   const ed = D.edges.find((x) => x.id === e.id) || e;
@@ -228,7 +188,7 @@ for (const e of L.edges) {
     st.fontSize = n(first.size);
     st.fontFamily = 'Helvetica';
     st.labelBackgroundColor = 'none';
-    st.align = first.anchor === 'end' ? 'right' : first.anchor === 'start' ? 'left' : 'center';
+    st.align = 'center';                    /* the offset below already places the label's centre */
     value = PLAIN ? labels.map(({ t }) => t.s).join('\n')
       : labels.map(({ t }) => (t.weight >= 600 ? `<b>${html(t.s)}</b>` : html(t.s))).join('<br>');
     if (PLAIN && first.weight >= 600) st.fontStyle = 1;

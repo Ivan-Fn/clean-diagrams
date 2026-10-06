@@ -23,16 +23,15 @@ claude plugin install clean-diagrams@clean-diagrams
 Or copy `skills/clean-diagrams` into `~/.claude/skills/` (all projects) or a project's
 `.claude/skills/`.
 
-The checks and exports need Node 20 or later and Playwright. Install them once in the
-skill's `scripts` folder:
+The checks, the draw.io converter and the SVG exports run on Node 18 or later with
+nothing to install, and need no browser. Optional extras, used when present:
 
-```bash
-cd ~/.claude/skills/clean-diagrams/scripts && npm install
-```
-
-For a plugin install, the folder is under `~/.claude/plugins/`; the skill tells Claude
-where it is. The draw.io desktop app is optional. It is needed only for `.drawio.svg` and
-`.drawio.png` exports (`brew install --cask drawio` on a Mac).
+| Extra | Adds | Install |
+|---|---|---|
+| `resvg`, `rsvg-convert` | PNG and PDF exports and preview images without a browser, drawn with the bundled Liberation Sans so they look the same on every machine | `nix profile install nixpkgs#resvg nixpkgs#librsvg` or `brew install resvg librsvg` |
+| Playwright with Chrome, Edge or its own Chromium | a second, render-based check pass and browser-rendered PNG and PDF | `npm install` in the skill's `scripts` folder; `npm run browser` for Chromium |
+| A running Chrome with a debug port | the same, without installing a browser | `CLEAN_DIAGRAMS_BROWSER=http://127.0.0.1:9222` |
+| draw.io desktop | `.drawio.svg` and `.drawio.png` exports | `brew install --cask drawio` |
 
 ## Use
 
@@ -48,8 +47,9 @@ and dark renders, and exports the formats you need.
 
 ## What the checker catches
 
-`scripts/check.mjs` renders the SVG in Chromium in light, dark, and with Arial standing
-in for the system font, and fails on:
+`scripts/check.mjs` reads the SVG with its stylesheet applied for the light and the dark
+theme, measures text with a table of character widths taken from the widest common
+fonts, and fails on:
 
 - text that does not fit its box, overlaps other text, or crosses a border
 - arrow labels crowding a box
@@ -58,8 +58,10 @@ in for the system font, and fails on:
 - contrast below WCAG AA in either theme, and text under 11 pixels
 - boxes outside the canvas, too close to each other, or straddling a container's border
 
-`npm test` in the `scripts` folder proves each of these fires on a deliberately broken
-diagram, and that the exports and the draw.io round trip work.
+When a browser is available it also renders the file in light, dark and Arial and runs
+the same checks on the render. `npm test` in the `scripts` folder proves each check fires
+on a deliberately broken diagram, with and without a browser, and that the exports and
+the draw.io round trip work.
 
 ## Files
 
@@ -72,4 +74,6 @@ diagram, and that the exports and the draw.io round trip work.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The bundled Liberation Sans font files in
+`skills/clean-diagrams/scripts/fonts/` are under the SIL Open Font License 1.1; see
+`LICENSE-LiberationSans.txt` in that folder.

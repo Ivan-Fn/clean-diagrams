@@ -9,16 +9,17 @@
  * output. A case whose edit did not apply fails, so a stale case cannot pass silently.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { inflateSync } from 'node:zlib';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TPL = resolve(HERE, '..', 'templates');
 const WORK = mkdtempSync(join(tmpdir(), 'clean-diagrams-test-'));
-const run = (script, args) => {
-  const r = spawnSync(process.execPath, [join(HERE, script), ...args], { encoding: 'utf8' });
+const run = (script, args, env = {}) => {
+  const r = spawnSync(process.execPath, [join(HERE, script), ...args], { encoding: 'utf8', env: { ...process.env, ...env } });
   return { code: r.status, out: `${r.stdout || ''}${r.stderr || ''}` };
 };
 let failed = 0, n = 0;
@@ -63,13 +64,21 @@ const cases = [
   ['straddles-group', 'groups.svg', '<rect class="box tint" x="40" y="100"', '<rect class="box tint" x="10" y="100"'],
   ['duplicate-id', 'flow.svg', '<g class="node" id="gateway">', '<g class="node" id="browser">'],
   ['viewbox', 'flow.svg', 'viewBox="0 0 760 262" ', ''],
+  ['xml', 'flow.svg', '>auth, rate limits<', '>auth & rate limits<'],
+  ['text-outside-box', 'flow.svg', '<text class="note" x="94" y="108">single-page app</text>', '<text class="note" x="94" y="108"><tspan x="94" y="108">single-page app</tspan><tspan x="94" dy="16">served from a CDN</tspan></text>'],
+  ['contrast', 'flow.svg', '<g class="node" id="orders">', '<g class="node" id="orders" opacity="0.35">'],
+  ['css-selector', 'flow.svg', '.note { font-size: 13px;', '.note:first-child { font-size: 13px; } .note { font-size: 13px;'],
 ];
 for (const [check, tpl, find, replace] of cases) {
   let p;
   try { p = broken(tpl, find, replace); } catch (e) { result(false, `check ${check}`, e.message); continue; }
-  const r = run('check.mjs', [p]);
-  const fired = r.out.split('\n').some((l) => l.startsWith('FAIL') && l.split(/\s+/)[1] === check);
-  result(r.code === 1 && fired, `check ${check} catches its defect`, fired ? '' : `exit ${r.code}; output: ${r.out.trim().split('\n').slice(0, 3).join(' | ')}`);
+  /* once as configured, and once with the browser switched off: the no-browser checker
+     must catch every defect on its own */
+  for (const [mode, env] of [['', {}], [' without a browser', { CLEAN_DIAGRAMS_BROWSER: 'none' }]]) {
+    const r = run('check.mjs', [p], env);
+    const fired = r.out.split('\n').some((l) => l.startsWith('FAIL') && l.split(/\s+/)[1] === check);
+    result(r.code === 1 && fired, `check ${check} catches its defect${mode}`, fired ? '' : `exit ${r.code}; output: ${r.out.trim().split('\n').slice(0, 3).join(' | ')}`);
+  }
 }
 
 /* 3. exports */
@@ -86,6 +95,43 @@ if (outs.every(existsSync)) {
   result(lightSvg.includes('@media not all') && darkSvg.includes('@media all'), 'split SVGs fix the theme');
   const chk = run('check.mjs', [outs[4], '--quiet']);
   result(chk.code === 0, 'the fixed dark SVG still passes the checks', chk.code ? chk.out.trim() : '');
+}
+
+/* 3b. export without a browser: renderer output when one is on PATH, a clear skip otherwise */
+{
+  const nb = join(WORK, 'nobrowser');
+  const r = run('export.mjs', [src, '--out', nb], { CLEAN_DIAGRAMS_BROWSER: 'none' });
+  const flatOk = ['before-after.flat.svg', 'before-after.flat.dark.svg', 'before-after.light.svg'].every((f) => existsSync(join(nb, f)));
+  const flat = flatOk ? readFileSync(join(nb, 'before-after.flat.svg'), 'utf8') : '';
+  result(r.code === 0 && flatOk && !flat.includes('var(') && !flat.includes('<style'), 'export without a browser writes flattened SVGs with no CSS left', r.code ? r.out : '');
+  const png = existsSync(join(nb, 'before-after.png')), pdf = existsSync(join(nb, 'before-after.pdf'));
+  const skippedPng = /skipped PNG/.test(r.out), skippedPdf = /skipped PDF/.test(r.out);
+  result((png || skippedPng) && (pdf || skippedPdf), `export without a browser: PNG ${png ? 'written' : 'skipped with a note'}, PDF ${pdf ? 'written' : 'skipped with a note'}`, r.out.trim().split('\n').slice(-2).join(' | '));
+  if (png) result(readFileSync(join(nb, 'before-after.png')).readUInt32BE(16) === 1520, 'renderer PNG is 2x the viewBox width');
+  if (pdf) {
+    /* page objects may sit in compressed object streams: search the inflated streams too */
+    const raw = readFileSync(join(nb, 'before-after.pdf'));
+    const parts = [raw.toString('latin1')];
+    for (const m of raw.toString('latin1').matchAll(/stream\r?\n/g)) {
+      const start = m.index + m[0].length, end = raw.indexOf('endstream', start);
+      try { parts.push(inflateSync(raw.subarray(start, end)).toString('latin1')); } catch { /* not deflated */ }
+    }
+    const bytes = parts.join('\n');
+    const box = bytes.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)/);
+    result(!!box && Math.round(Number(box[1])) === 570 && Math.round(Number(box[2])) === 270, 'renderer PDF is the diagram\'s size (760x360 px = 570x270 pt)', box ? `${box[1]}x${box[2]}` : 'no MediaBox');
+    /* fonts in the PDF, if any, must be the bundled one: never a substitute */
+    const fonts = [...bytes.matchAll(/\/BaseFont\s*\/([\w+-]+)/g)].map((m) => m[1]);
+    result(fonts.every((f) => /LiberationSans/.test(f)), 'renderer PDF uses only the bundled font', fonts.join(', ') || 'text outlined, no font objects');
+  }
+  if (png || pdf) {
+    /* with no font anywhere, the export must fail and leave nothing at the output path */
+    const empty = join(WORK, 'empty-fonts'), out = join(WORK, 'nofont');
+    mkdirSync(empty, { recursive: true });
+    const f = run('export.mjs', [src, '--png', '--pdf', '--out', out], { CLEAN_DIAGRAMS_BROWSER: 'none', CLEAN_DIAGRAMS_FONT_DIR: empty, CLEAN_DIAGRAMS_SYSTEM_FONTS: '0' });
+    const left = ['before-after.png', 'before-after.dark.png', 'before-after.pdf'].filter((x) => existsSync(join(out, x)));
+    result(f.code === 1 && /font/i.test(f.out) && left.length === 0 || (f.code === 1 && /font/i.test(f.out) && !png && left.length === 0),
+      'export with no usable font fails and writes no picture', `exit ${f.code}; left: ${left.join(', ') || 'none'}; ${f.out.trim().split('\n').pop()}`);
+  }
 }
 
 /* 4. draw.io conversion and the round trip through extract */
