@@ -16,21 +16,25 @@
  *                   instead of HTML inside the SVG, which some non-browser tools need, but
  *                   a box's name and note share one font size.
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { parseArgs, requireFile } from './lib/args.mjs';
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parse, computeStyles, elements, hasClass, closest, textOf, inDefs, color, hex, num, weight, rectBox, textBox, pathPoints, polyLength, pointAt, viewBox } from './lib/svgdom.mjs';
 
-const argv = process.argv.slice(2);
-const pos = argv.filter((a) => !a.startsWith('--'));
-if (!pos[0] || !existsSync(pos[0])) {
-  console.error('usage: node to-drawio.mjs <diagram.svg> [out.drawio] [--export] [--plain-labels]');
-  process.exit(2);
-}
-const SVG = resolve(pos[0]);
-const OUT = resolve(pos[1] || join(dirname(SVG), `${basename(SVG, '.svg')}.drawio`));
-const PLAIN = argv.includes('--plain-labels');
+const USAGE = 'node to-drawio.mjs <diagram.svg> [out.drawio] [--export] [--plain-labels]';
+const args = parseArgs(process.argv.slice(2), { flags: ['--export', '--plain-labels'], usage: USAGE, maxPositional: 2 });
+requireFile(args.positional[0], USAGE);
+const SVG = resolve(args.positional[0]);
+const OUT = resolve(args.positional[1] || join(dirname(SVG), `${basename(SVG, '.svg')}.drawio`));
+const PLAIN = args.flags.has('--plain-labels');
 const SRC = readFileSync(SVG, 'utf8');
+{
+  const d = parse(SRC);
+  if (!d.svg || !viewBox(d.svg)) { console.error(`to-drawio: ${SVG} is not an SVG with a viewBox; run check.mjs first`); process.exit(1); }
+  if (d.errors.length) { console.error(`to-drawio: ${SVG} is not well-formed XML (${d.errors[0]}); run check.mjs first`); process.exit(1); }
+}
+mkdirSync(dirname(OUT), { recursive: true });
 
 /* Read the diagram for one theme without a browser: geometry from the attributes, colours
    from the file's own stylesheet, text extents from the measured width table. */
@@ -47,28 +51,37 @@ const read = (theme) => {
   const txt = (t) => ({ s: textOf(t).trim().replace(/\s+/g, ' '), size: num(t.cs['font-size'], 16), weight: weight(t.cs['font-weight']),
     color: toHex(t.cs.fill), anchor: t.cs['text-anchor'], box: bb(textBox(t)), x: num(t.attrs.x), y: num(t.attrs.y), cls: t.attrs.class || '' });
   for (const g of all.filter(isShape)) if (!g.attrs.id || !g.children.some((c) => c.tag === 'rect')) console.error(`to-drawio: skipped a ${hasClass(g, 'node') ? 'box' : 'container'} ${g.attrs.id ? `#${g.attrs.id}` : 'without an id'}: it needs an id and a <rect>. Run check.mjs first.`);
-  const shapes = all.filter(isShape).filter((g) => g.attrs.id && g.children.some((c) => c.tag === 'rect')).map((g) => {
+  let shapes = all.filter(isShape).filter((g) => g.attrs.id && g.children.some((c) => c.tag === 'rect')).map((g) => {
     const rect = g.children.find((c) => c.tag === 'rect');
     return { id: g.attrs.id, kind: hasClass(g, 'node') ? 'node' : 'group', rect: bb(rectBox(rect)), rx: num(rect.attrs.rx),
       paint: paint(rect), texts: elements(g).filter((e) => e.tag === 'text' && textOf(e).trim()).map(txt) };
   });
+  /* lifelines: a vertical dashed line under a party's box */
+  const lifelines = [];
+  for (const g of all.filter((e) => e.tag === 'g' && hasClass(e, 'lifeline') && e.attrs.id)) {
+    const line = g.children.find((c) => c.tag === 'path' || c.tag === 'line');
+    if (!line) continue;
+    const pts = line.tag === 'line' ? [{ x: num(line.attrs.x1), y: num(line.attrs.y1) }, { x: num(line.attrs.x2), y: num(line.attrs.y2) }] : pathPoints(line.attrs.d || '');
+    const ys = pts.map((q) => q.y);
+    lifelines.push({ id: g.attrs.id, x: pts[0].x, y0: Math.min(...ys), y1: Math.max(...ys), paint: paint(line) });
+  }
   const edges = all.filter((e) => e.tag === 'path' && hasClass(e, 'edge')).map((p, i) => {
     let pts;
     try { pts = pathPoints(p.attrs.d || ''); } catch (err) { throw new Error(`arrow ${p.attrs.id || i + 1}: ${err.message}. Run check.mjs first.`); }
-    const len = polyLength(pts), n = Math.max(2, Math.ceil(len / 4));
+    const len = polyLength(pts), n = Math.min(4000, Math.max(2, Math.ceil(len / 4)));
     return { id: p.attrs.id || `edge-${i + 1}`, from: p.attrs['data-from'], to: p.attrs['data-to'], d: p.attrs.d, paint: paint(p), mid: pointAt(pts, len / 2),
       head: !!(p.attrs['marker-end'] || (p.cs['marker-end'] && p.cs['marker-end'] !== 'none')), samples: Array.from({ length: n }, (_, i) => pointAt(pts, (len * i) / (n - 1))) };
   });
   const free = all.filter((t) => t.tag === 'text' && textOf(t).trim() && !closest(t, isShape)).map(txt);
   const loose = all.filter((r) => r.tag === 'rect' && !closest(r, isShape) && !hasClass(r, 'bg')).map((r) => ({ rect: bb(rectBox(r)), rx: num(r.attrs.rx), paint: paint(r) }));
   const title = all.find((e) => e.tag === 'text' && hasClass(e, 'title'));
-  return { W: vb.w, H: vb.h, shapes, edges, free, loose, title: title ? textOf(title).trim() : '' };
+  return { W: vb.w, H: vb.h, shapes, edges, free, loose, lifelines, title: title ? textOf(title).trim() : '' };
 };
 let model;
 try { model = { light: read('light'), dark: read('dark') }; } catch (e) { console.error(`to-drawio: ${e.message}`); process.exit(1); }
 const L = model.light, D = model.dark;
 
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '&#10;');
 const html = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const pair = (a, b) => (a === 'none' && b === 'none' ? 'none' : a === b ? a : `light-dark(${a},${b})`);
 const n = (v) => Math.round(v * 100) / 100;
@@ -111,7 +124,7 @@ for (const s of ordered) {
       st.align = first.anchor === 'middle' ? 'center' : first.anchor === 'end' ? 'right' : 'left';
       st.spacingTop = n(first.box.y - s.rect.y - 2);
       if (st.align === 'left') st.spacingLeft = n(first.box.x - s.rect.x - 2);
-      value = first.s;
+      value = PLAIN ? tl.map((t) => t.s).join('\n') : [html(first.s), ...tl.slice(1).map((t) => `<span style="font-weight:normal;opacity:0.75">${html(t.s)}</span>`)].join('<br>');
     } else if (PLAIN) {
       value = tl.map((t) => t.s).join('\n');
     } else {
@@ -159,15 +172,42 @@ L.free.forEach((t, i) => {
     attached.get(best.e.id).push({ t, td });
   } else standalone.push({ t, td });
 });
+/* A second line of a label (directly above or below an attached line, overlapping it
+   horizontally) belongs to the same arrow, even when it sits further from the line. */
+for (let changed = true; changed;) {
+  changed = false;
+  for (let i = standalone.length - 1; i >= 0; i--) {
+    const { t } = standalone[i];
+    if (t.cls.includes('title')) continue;
+    for (const [eid, list] of attached) {
+      const near = list.some(({ t: a }) => Math.abs((a.box.y + a.box.h / 2) - (t.box.y + t.box.h / 2)) <= Math.max(a.box.h, t.box.h) * 1.4
+        && Math.min(a.box.x + a.box.w, t.box.x + t.box.w) - Math.max(a.box.x, t.box.x) >= 0.4 * Math.min(a.box.w, t.box.w));
+      if (near) { list.push(standalone[i]); standalone.splice(i, 1); changed = true; break; }
+    }
+  }
+}
 
 /* edges */
 const rectOf = (id) => L.shapes.find((s) => s.id === id)?.rect;
+/* A lifeline is drawn in draw.io as a dashed line that starts on the bottom of the box above
+   it (so it moves with that box) and ends at a free point. Messages between lifelines are
+   free arrows at their exact positions: draw.io would re-route arrows attached to a line. */
+const lifelineIds = new Set(L.lifelines.map((l) => l.id));
+for (const l of L.lifelines) {
+  const ld = D.lifelines.find((x) => x.id === l.id) || l;
+  const owner = L.shapes.find((s) => s.kind === 'node' && l.x > s.rect.x && l.x < s.rect.x + s.rect.w && Math.abs(s.rect.y + s.rect.h - l.y0) <= 3);
+  const st = { edgeStyle: 'none', html: 1, endArrow: 'none', startArrow: 'none', strokeColor: pair(l.paint.stroke, ld.paint.stroke), strokeWidth: n(l.paint.sw),
+    dashed: l.paint.dash ? 1 : undefined, dashPattern: l.paint.dash || undefined,
+    exitX: owner ? n((l.x - owner.rect.x) / owner.rect.w) : undefined, exitY: owner ? 1 : undefined, exitDx: 0, exitDy: 0, exitPerimeter: 0 };
+  cells.push(`<mxCell id="${esc(l.id)}" value="" style="${esc(style(st))}" edge="1" parent="1"${owner ? ` source="${esc(owner.id)}"` : ''}><mxGeometry relative="1" as="geometry"><mxPoint x="${n(l.x)}" y="${n(l.y0)}" as="sourcePoint"/><mxPoint x="${n(l.x)}" y="${n(l.y1)}" as="targetPoint"/></mxGeometry></mxCell>`);
+}
 for (const e of L.edges) {
   const ed = D.edges.find((x) => x.id === e.id) || e;
+  if (lifelineIds.has(e.from) || lifelineIds.has(e.to)) { e.free = true; }
   const pts = pathPoints(e.d);
   const a = pts[0], b = pts[pts.length - 1];
   const rs = rectOf(e.from), rt = rectOf(e.to);
-  const rel = (pt, r) => ({ x: n(Math.min(1, Math.max(0, (pt.x - r.x) / r.w))), y: n(Math.min(1, Math.max(0, (pt.y - r.y) / r.h))) });
+  const rel = (pt, r) => ({ x: r.w ? n(Math.min(1, Math.max(0, (pt.x - r.x) / r.w))) : 0.5, y: r.h ? n(Math.min(1, Math.max(0, (pt.y - r.y) / r.h))) : 0.5 });
   const ex = rs ? rel(a, rs) : null, en = rt ? rel(b, rt) : null;
   const p = e.paint, q = ed.paint;
   const st = {
@@ -195,8 +235,9 @@ for (const e of L.edges) {
     offset = `<mxPoint x="${n((u.x + u.r) / 2 - e.mid.x)}" y="${n((u.y + u.b) / 2 - e.mid.y)}" as="offset"/>`;
   }
   const way = pts.slice(1, -1).map((pt) => `<mxPoint x="${n(pt.x)}" y="${n(pt.y)}"/>`).join('');
-  const src = shapeIds.has(e.from) ? ` source="${esc(e.from)}"` : '';
-  const tgt = shapeIds.has(e.to) ? ` target="${esc(e.to)}"` : '';
+  if (e.free) { delete st.exitX; delete st.exitY; delete st.entryX; delete st.entryY; st.edgeStyle = 'none'; }
+  const src = !e.free && shapeIds.has(e.from) ? ` source="${esc(e.from)}"` : '';
+  const tgt = !e.free && shapeIds.has(e.to) ? ` target="${esc(e.to)}"` : '';
   cells.push(`<mxCell id="${esc(e.id || uid('edge'))}" value="${esc(value)}" style="${esc(style(st))}" edge="1" parent="1"${src}${tgt}><mxGeometry relative="1" as="geometry"><mxPoint x="${n(a.x)}" y="${n(a.y)}" as="sourcePoint"/><mxPoint x="${n(b.x)}" y="${n(b.y)}" as="targetPoint"/>${way ? `<Array as="points">${way}</Array>` : ''}${offset}</mxGeometry></mxCell>`);
 }
 
@@ -224,7 +265,7 @@ const xml = `<mxfile host="clean-diagrams" type="device">
 writeFileSync(OUT, xml);
 console.log(OUT);
 
-if (argv.includes('--export')) {
+if (args.flags.has('--export')) {
   const candidates = [process.env.DRAWIO_BIN, '/Applications/draw.io.app/Contents/MacOS/draw.io', 'drawio', 'draw.io'].filter(Boolean);
   const bin = candidates.find((c) => spawnSync(c, ['--version'], { encoding: 'utf8', timeout: 30000 }).status === 0);
   if (!bin) {

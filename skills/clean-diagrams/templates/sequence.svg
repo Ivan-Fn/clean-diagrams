@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 262" width="760" height="262" role="img" aria-label="Reads go to the cache first, and only a miss reaches the database">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 428" width="760" height="428" role="img" aria-label="The API only ever sees the access token">
   <style>
     svg { --bg:#ffffff; --ink:#0e0e0e; --quiet:#484745; --line:#bbbaaf; --tint:#f3f2ee;
           --accent:#266dcc; --accent-soft:#e5edf9; --good:#169824; --good-soft:#e3f3e5;
@@ -44,47 +44,47 @@
     <marker id="arrow-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head good" d="M0 0L10 5L0 10z"/></marker>
     <marker id="arrow-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head bad" d="M0 0L10 5L0 10z"/></marker>
   </defs>
-  <rect class="bg" width="760" height="262"/>
+  <rect class="bg" width="760" height="428"/>
 
-  <text class="title" x="24" y="34">Reads go to the cache first, and only a miss reaches the database</text>
+  <text class="title" x="24" y="34">The API only ever sees the access token</text>
 
-  <!-- row A: boxes 140 wide, 50 apart, centre line y=94 -->
-  <g class="node" id="browser">
-    <rect class="box" x="24" y="66" width="140" height="56" rx="8"/>
-    <text class="name" x="94" y="90">Browser</text>
-    <text class="note" x="94" y="108">single-page app</text>
+  <!-- one box per party; its lifeline runs down from the box. Arrows start and end on lifelines. -->
+  <g class="node" id="user-box">
+    <rect class="box" x="25" y="56" width="150" height="48" rx="8"/>
+    <text class="name" x="100" y="85">User</text>
   </g>
-  <g class="node" id="gateway">
-    <rect class="box" x="214" y="66" width="140" height="56" rx="8"/>
-    <text class="name" x="284" y="90">API gateway</text>
-    <text class="note" x="284" y="108">auth, rate limits</text>
+  <g class="node" id="app-box">
+    <rect class="box" x="212" y="56" width="150" height="48" rx="8"/>
+    <text class="name" x="287" y="85">App</text>
   </g>
-  <g class="node" id="orders">
-    <rect class="box" x="404" y="66" width="140" height="56" rx="8"/>
-    <text class="name" x="474" y="90">Orders service</text>
-    <text class="note" x="474" y="108">3 replicas</text>
+  <g class="node" id="idp-box">
+    <rect class="box" x="399" y="56" width="150" height="48" rx="8"/>
+    <text class="name" x="474" y="85">Identity provider</text>
   </g>
-  <g class="node" id="cache">
-    <rect class="box accent" x="594" y="66" width="140" height="56" rx="8"/>
-    <text class="name" x="664" y="90">Cache</text>
-    <text class="note" x="664" y="108">60-second TTL</text>
+  <g class="node" id="api-box">
+    <rect class="box accent" x="586" y="56" width="150" height="48" rx="8"/>
+    <text class="name" x="661" y="85">API</text>
   </g>
+  <g class="lifeline" id="user"><path class="lifeline" d="M100 104V404"/></g>
+  <g class="lifeline" id="app"><path class="lifeline" d="M287 104V404"/></g>
+  <g class="lifeline" id="idp"><path class="lifeline" d="M474 104V404"/></g>
+  <g class="lifeline" id="api"><path class="lifeline" d="M661 104V404"/></g>
 
-  <!-- row B -->
-  <g class="node" id="database">
-    <rect class="box" x="594" y="182" width="140" height="56" rx="8"/>
-    <text class="name" x="664" y="206">Database</text>
-    <text class="note" x="664" y="224">primary + replica</text>
-  </g>
-
+  <!-- messages top to bottom in time order, 40 apart; replies dashed -->
   <g class="edges">
-    <path class="edge" id="e-browser-gateway" data-from="browser" data-to="gateway" d="M164 94H214" marker-end="url(#arrow)"/>
-    <path class="edge" id="e-gateway-orders" data-from="gateway" data-to="orders" d="M354 94H404" marker-end="url(#arrow)"/>
-    <path class="edge accent" id="e-orders-cache" data-from="orders" data-to="cache" d="M544 94H594" marker-end="url(#arrow-accent)"/>
-    <path class="edge dashed" id="e-cache-database" data-from="cache" data-to="database" d="M664 122V182" marker-end="url(#arrow)"/>
+    <path class="edge" id="m1" data-from="user" data-to="app" d="M100 140H287" marker-end="url(#arrow)"/>
+    <path class="edge" id="m2" data-from="app" data-to="idp" d="M287 180H474" marker-end="url(#arrow)"/>
+    <path class="edge dashed" id="m3" data-from="idp" data-to="app" d="M474 220H287" marker-end="url(#arrow)"/>
+    <path class="edge" id="m4" data-from="app" data-to="idp" d="M287 260H474" marker-end="url(#arrow)"/>
+    <path class="edge dashed" id="m5" data-from="idp" data-to="app" d="M474 300H287" marker-end="url(#arrow)"/>
+    <path class="edge accent" id="m6" data-from="app" data-to="api" d="M287 340H661" marker-end="url(#arrow-accent)"/>
+    <path class="edge dashed" id="m7" data-from="api" data-to="app" d="M661 380H287" marker-end="url(#arrow)"/>
   </g>
-  <text class="label" x="189" y="86" text-anchor="middle">HTTPS</text>
-  <text class="label" x="379" y="86" text-anchor="middle">/orders</text>
-  <text class="label" x="569" y="86" text-anchor="middle">read</text>
-  <text class="label" x="672" y="156">on miss</text>
+  <text class="label" x="193" y="132" text-anchor="middle">open page</text>
+  <text class="label" x="380" y="172" text-anchor="middle">redirect to sign-in</text>
+  <text class="label" x="380" y="212" text-anchor="middle">code</text>
+  <text class="label" x="380" y="252" text-anchor="middle">exchange code for tokens</text>
+  <text class="label" x="380" y="292" text-anchor="middle">ID token + access token</text>
+  <text class="label accent strong" x="380" y="332" text-anchor="middle">call with access token</text>
+  <text class="label" x="567" y="372" text-anchor="middle">data</text>
 </svg>

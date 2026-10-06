@@ -39,14 +39,19 @@ its background rectangle. Then:
 - A box is a `<g class="node">` with an `id`, exactly one `<rect>` as a direct child, and
   its text lines. A container is the same with `class="group"`. Boxes inside a container
   are written after it, as siblings.
-- An arrow is a `<path class="edge">` with `data-from` and `data-to` naming box or
-  container ids. Write `d` with absolute `M`, `H`, `V` and `L` commands only; the draw.io
+- A lifeline (sequence diagrams) is a `<g class="lifeline">` with an `id` and one vertical
+  `<path class="lifeline" d="Mx y1 Vy2">`, starting on the bottom edge of its party's box.
+- An arrow is a `<path class="edge">` with `data-from` and `data-to` naming box, container
+  or lifeline ids. Write `d` with absolute `M`, `H`, `V` and `L` commands only; the draw.io
   converter reads those.
 - Arrow labels and other free text are plain `<text>` elements outside any box.
 - `id`s are short slugs (`orders`, `e-orders-db`). draw.io keeps them as cell ids.
 - No `transform` attributes. The checker measures untransformed geometry.
 
 ## Classes
+
+"Ink" is the main text colour and "quiet" the softer grey for secondary text; both are in
+the palette table under Colour.
 
 | Element | Class | Look |
 |---|---|---|
@@ -58,7 +63,8 @@ its background rectangle. Then:
 | box name | `name` | 15 semibold, centred |
 | box note | `note` | 13, quiet, centred |
 | single-line item | `item` | 13, ink, centred |
-| container | `group` on the `<rect>`, optional `dashed` or `tint` | grey border 1.25 |
+| container | `group` on the `<rect>`, optional `dashed` or `tint` | grey border 1.25; `tint` is a grey fill with no border |
+| lifeline | `lifeline` on the `<path>` | grey dashed line 1.25 |
 | container name | `group-name`, optional `accent` | 14 semibold, quiet or blue |
 | arrow | `edge`, optional `accent` / `good` / `bad`, optional `dashed` | grey 1.25, or coloured 2 |
 | arrowhead | `marker-end="url(#arrow)"`, `#arrow-accent`, `#arrow-good`, `#arrow-bad` | match the arrow's colour |
@@ -94,18 +100,20 @@ The template's palette, for reference:
 
 ## Box sizing
 
-SVG text never wraps. Count characters and size the box from its longest line. Widths
-per character, measured and rounded up so a fallback font still fits:
+SVG text never wraps. Count characters and size the box from its longest line. Average
+widths per character, from the checker's own width table (lower case and mixed case;
+count a run of capitals at 1.3 times):
 
 | Text | Units per character |
 |---|---|
-| `name`, `title` (15 semibold) | 7.5 |
-| `group-name` (14 semibold) | 7 |
-| `note`, `item` (13) | 6.4 |
-| `label` (11.5) | 5.8 |
+| `name`, `title` (15 semibold) | 8.5 |
+| `group-name` (14 semibold) | 8 |
+| `note`, `item` (13) | 7 |
+| `label` (11.5) | 6.3 |
 
-- **Width** = longest line × its units + 24. Round up to a multiple of 8. Boxes in one row
-  share a width.
+- **Width** = longest line × its units + 24, rounded up to a whole number. Boxes in one
+  row share a width. The checker's number decides: when it asks for a wider box, use the
+  width it names.
 - **Height** = 40 + 16 per note line. A name with no notes: 48. An `item`: 40.
 - A line that does not fit gets broken in two at a natural phrase boundary, or the box gets
   wider. Never let a word touch the border.
@@ -136,7 +144,9 @@ the last ends at least 16 above its bottom edge.
   bend in the gap between columns or rows, never inside a box.
 - Several arrows fanning out from one box share their first segment and split in the gap.
 - Dashed (`dashed`) means conditional, planned or not yet in effect. Say which in the
-  label or legend.
+  label or legend. In a sequence diagram, dashed is a reply.
+- An arrow entering a container from above or below crosses the container's name if it
+  enters at the name's x. Enter off-centre, or put the name 16 in from the left.
 - A label goes above a horizontal run or beside a vertical one, at least 4 clear of every
   box. When the gap is narrower than the label plus 8, widen the gap or put the label above
   the row.

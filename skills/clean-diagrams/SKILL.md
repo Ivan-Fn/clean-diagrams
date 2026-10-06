@@ -13,8 +13,9 @@ other format is generated from it.
 Scripts live in `scripts/` next to this file and run on Node 18 or later with nothing to
 install. Optional extras, used automatically when present:
 
-- `resvg` or `rsvg-convert` on PATH: PNG and PDF exports and preview images without a
-  browser (`nix profile install nixpkgs#resvg nixpkgs#librsvg`, or `brew install resvg librsvg`).
+- `resvg` (PNG) and `rsvg-convert` (PNG and PDF) on PATH: exports and preview images
+  without a browser, drawn with the bundled Liberation Sans so they look the same on every
+  machine (`nix profile install nixpkgs#resvg nixpkgs#librsvg`, or `brew install resvg librsvg`).
 - A browser, for a second, render-based check pass: `npm install` in `scripts/` adds
   Playwright, which uses installed Chrome or Edge, or `npm run browser` for its own
   Chromium. To use a Chrome you started with `--remote-debugging-port=9222`, set
@@ -36,9 +37,9 @@ install. Optional extras, used automatically when present:
 2. **Pick a layout** from [references/layouts.md](references/layouts.md) and copy the
    closest file from `templates/`. Keep its `<style>` and `<defs>` blocks as they are.
 3. **Write the SVG** following [references/style.md](references/style.md): the markup the
-   scripts read, the box-sizing arithmetic, and the colour rules. Use whole numbers, and
-   multiples of 8 for sizes where the arithmetic allows. Exact alignment matters more:
-   boxes in a row share their top edge and height, and gaps in a row are equal.
+   scripts read, the box-sizing arithmetic, and the colour rules. Use whole numbers.
+   Exact alignment matters most: boxes in a row share their top edge and height, and gaps
+   in a row are equal.
 4. **Check it, then look at it.**
    ```bash
    node scripts/check.mjs diagram.svg --out /tmp/diagram-check
@@ -47,10 +48,9 @@ install. Optional extras, used automatically when present:
    `diagram.check-light.png` and `diagram.check-dark.png` from the output folder and ask
    whether the title's claim is visible at a glance. Repeat until both are true. The last
    line says what checked the file and made the previews; without a browser or a renderer
-   there are no PNG previews, and the checks alone decide. Without a browser the checker
-   measures text with the widest of the macOS system font, Arial, Helvetica and Helvetica
-   Neue at each size, so it may ask for a box a few units wider than a browser would;
-   widen it.
+   there are no PNG previews, and the checks alone decide. The checker measures text with
+   the widest of the macOS system font, Arial, Helvetica and Helvetica Neue at each size,
+   so it may ask for a box a few units wider than one browser needs; widen it.
 5. **Export for where it is going** ([references/publish.md](references/publish.md)):
 
    | Destination | Command | Output |
@@ -58,7 +58,7 @@ install. Optional extras, used automatically when present:
    | GitHub, MkDocs, any Markdown | none | the SVG itself |
    | Markdown with a `<picture>` element | `node scripts/export.mjs diagram.svg --split` | `diagram.light.svg`, `diagram.dark.svg` |
    | Slides, chat, documents | `node scripts/export.mjs diagram.svg --png` | `diagram.png`, `diagram.dark.png` at 2x |
-   | Papers, print | `node scripts/export.mjs diagram.svg --pdf` | `diagram.pdf`, vector, fonts embedded |
+   | Papers, print | `node scripts/export.mjs diagram.svg --pdf` | `diagram.pdf`, vector; text selectable when made with a browser, outlined without one |
    | PowerPoint, Keynote, Inkscape, LaTeX `svg` package | `node scripts/export.mjs diagram.svg --flat` | `diagram.flat.svg`, `diagram.flat.dark.svg` |
    | Editable in draw.io | `node scripts/to-drawio.mjs diagram.svg` | `diagram.drawio` |
    | One file GitHub shows and draw.io edits | `node scripts/to-drawio.mjs diagram.svg --export` | `diagram.drawio.svg`, `diagram.drawio.png` (needs draw.io desktop) |
@@ -87,8 +87,8 @@ user marks as important. Tell the user anything you merged, renamed or dropped.
   the accent: a 2-wide coloured border and a pale fill of the same colour.
 - Green, red and amber mean good, bad and warning. Use them only for that, and add a
   legend when they appear.
-- Text comes in three sizes: 15 semibold for names and the title, 13 for notes, 11.5 for
-  arrow labels. Nothing below 11.
+- Text comes in four sizes: 15 semibold for names and the title, 14 semibold for container
+  names, 13 for notes, 11.5 for arrow labels. Nothing below 11.
 - SVG text does not wrap. Break lines yourself and size each box from its longest line
   (the arithmetic is in style.md).
 - Arrows run in the gaps between boxes, start and end on a box edge, and bend at right
@@ -106,6 +106,7 @@ user marks as important. Tell the user anything you merged, renamed or dropped.
 | `templates/hub.svg` | Several inputs into one component, several outputs from it |
 | `templates/groups.svg` | Stages or zones as containers holding smaller items |
 | `templates/before-after.svg` | An approved path in green and a new path in red, with a legend |
+| `templates/sequence.svg` | Messages between parties in time order, on lifelines |
 | `scripts/check.mjs` | Layout, text-fit, arrow and contrast checks in light and dark, with Node alone; a browser adds a render pass |
 | `scripts/export.mjs` | PNG, PDF, fixed-theme and flattened SVG exports |
 | `scripts/to-drawio.mjs` | SVG to an editable `.drawio` file, optionally exported by draw.io |

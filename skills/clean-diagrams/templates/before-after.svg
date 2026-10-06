@@ -34,6 +34,7 @@
     .edge.good { stroke: var(--good); stroke-width: 2; }
     .edge.bad { stroke: var(--bad); stroke-width: 2; }
     .edge.dashed { stroke-dasharray: 5 4; }
+    path.lifeline { fill: none; stroke: var(--line); stroke-width: 1.25; stroke-dasharray: 3 4; }
     .head { fill: var(--line); } .head.accent { fill: var(--accent); }
     .head.good { fill: var(--good); } .head.bad { fill: var(--bad); }
   </style>

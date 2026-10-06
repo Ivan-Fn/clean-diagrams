@@ -1,4 +1,4 @@
 node_modules/
 .DS_Store
-*.light.png
-*.dark.png
+*.check-light.*
+*.check-dark.*

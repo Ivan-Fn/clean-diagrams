@@ -3,9 +3,11 @@
  * found on PATH. Set CLEAN_DIAGRAMS_RENDERER to resvg, rsvg-convert or inkscape to choose.
  *
  *   resvg          PNG only. Closest to Chromium. Nix: nixpkgs#resvg; Homebrew: resvg
- *   rsvg-convert   PNG and PDF (vector). Nix: nixpkgs#librsvg; Homebrew: librsvg. For PDF, when
- *                  usvg (shipped with resvg) is present, text is first outlined from the
- *                  bundled font, so the PDF matches everywhere but its text is not selectable
+ *   rsvg-convert   PNG and PDF (vector). Nix: nixpkgs#librsvg; Homebrew: librsvg. When usvg
+ *                  (shipped with resvg) is present, text is first outlined from the bundled
+ *                  font, so output matches everywhere; PDF text is then not selectable.
+ *                  Without usvg, rsvg-convert finds fonts through fontconfig on Linux (bundled
+ *                  folder only) and through the system on macOS, where the folder is ignored
  *   inkscape       PNG and PDF. Uses the machine's fonts
  *
  * Fonts. resvg and rsvg-convert draw with the bundled Liberation Sans (fonts/, SIL Open Font
@@ -54,16 +56,16 @@ function attempt(r, args, env) {
 }
 
 function run(r, kind, input, output, scale) {
+  if (!existsSync(FONT_DIR)) throw new Error(`font folder ${FONT_DIR} does not exist. ${FONT_HINT}`);
   const tmp = mkdtempSync(join(tmpdir(), 'clean-diagrams-render-'));
   const tmpOut = join(tmp, `out.${kind}`);
   const allowSystem = needsSystemFonts(input) && process.env.CLEAN_DIAGRAMS_SYSTEM_FONTS !== '0';
-  if (!existsSync(FONT_DIR)) throw new Error(`font folder ${FONT_DIR} does not exist. ${FONT_HINT}`);
   try {
     let res;
     if (r.name === 'resvg') {
       const fontArgs = ['--use-fonts-dir', FONT_DIR, '--sans-serif-family', BUNDLED_FONT, ...(allowSystem ? [] : ['--skip-system-fonts'])];
       res = attempt(r, [...fontArgs, ...r[kind](input, tmpOut, scale)]);
-    } else if (r.name === 'rsvg-convert' && kind === 'pdf' && works('usvg')) {
+    } else if (r.name === 'rsvg-convert' && works('usvg')) {
       /* rsvg-convert picks fonts through the platform (CoreText on macOS), which ignores the
          bundled folder. usvg converts the text to outlines from the bundled font first, so
          the PDF looks the same everywhere. The text is then shapes, not selectable text. */
@@ -78,7 +80,8 @@ function run(r, kind, input, output, scale) {
       const env = {};
       if (!allowSystem) {
         const conf = join(tmp, 'fonts.conf');
-        writeFileSync(conf, `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>${FONT_DIR}</dir><cachedir>${join(tmp, 'cache')}</cachedir>`
+        const x = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        writeFileSync(conf, `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>${x(FONT_DIR)}</dir><cachedir>${x(join(tmp, 'cache'))}</cachedir>`
           + `<alias><family>sans-serif</family><prefer><family>${BUNDLED_FONT}</family></prefer></alias></fontconfig>`);
         env.FONTCONFIG_FILE = conf;
       }
